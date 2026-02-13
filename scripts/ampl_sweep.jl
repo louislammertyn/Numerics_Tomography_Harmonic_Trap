@@ -21,6 +21,7 @@ Hx = construct_hamiltonians(p.L)
 
 results = Dict()
 for k in LinRange(0.1, 1, 10)
+    
     p = update(p; κ=k)
     ## Time evolution where the lists indicate the time dependent functions and their corresponding operators ## 
     f_ts = (t-> one(ComplexF64), p.f_t)
@@ -66,10 +67,11 @@ plot(sort([collect(keys(results))..., 4.]), Maxima .- 10.3, marker=:o, xlabel="�
 # Gif
 data = JLD2.load("kappasweep.jld2")
 results = data["results"] 
-for k in [ 0.5, 1.0, 4.0]s
+for k in [ 1.]
     sol = results[k]
     p = update(p; κ=k)
     total_t = length(sol.t)
-    #gif_ρ(sol, p; Nt=div(total_t,1), magfile="rho_mag_$(k).gif", phasefile="rho_phase_$(k).gif", every=10)
-    gif_x(sol, p; Nt=div(total_t,1), filename="rho_x_$(k).gif", every=5)
+    plot_center_of_mass(sol, p)
+    #gif_ρ_diag(sol, p; Nt=div(total_t,1), magfile="rho_diag_$(k).gif",  every=5)
+    #gif_x(sol, p; Nt=div(total_t,1), filename="rho_diag_$(k).gif", every=5)
 end

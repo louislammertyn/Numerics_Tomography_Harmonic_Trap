@@ -1,3 +1,11 @@
+function check_conservation_of_probability(sol)
+    prob = []
+    for ρ in sol.u 
+        push!(prob, sum(diag(ρ)))
+    end
+    return prob
+end
+
 function plot_center_of_mass(sol, p)
 
     ### --- Create empty plots --- ###
@@ -75,6 +83,51 @@ function plot_center_of_mass(sol, p)
     return pl, pl2, pl3, pl4
 end
 
+function plot_center_of_mass_wFL(sols, p)
+
+    ### --- Create empty plots --- ###
+    pl = plot(
+        xlabel = L"$t\; (ms)$",
+        ylabel = L"$\langle \lambda  \rangle$",
+        title  = "Center of mass motion λ-space for k=$(p.κ) (ħω)",
+        legend = true, grid = true, framestyle = :box
+    )
+    sol = sols[1]
+    sol_fl = sols[2]
+    # Pre-allocate
+    times = [sol.t[s] / p.ω * 1e3 for s in eachindex(sol.t)]
+    l_coms = Float64[]
+    l_coms_fl = Float64[]
+
+    # Add legend entries for stroboscopic markers
+    scatter!(pl,  [NaN], [NaN], color=:red, marker=:x, label="Stroboscopic")
+
+    i = 1
+
+    ### --- Main loop --- ###
+    for s in eachindex(sol.t)
+        state = sol.u[s]
+        state_fl = sol_fl.u[s]
+
+        l_com = real(tr(state * Diagonal(0:(p.L-1))))
+        push!(l_coms, l_com)
+
+        l_com_fl = real(tr(state_fl * Diagonal(0:(p.L-1))))
+        push!(l_coms_fl, l_com_fl)
+
+        # stroboscopic points
+        if i ≤ length(p.strob_ts) && isapprox(sol.t[s], p.strob_ts[i]; atol=1e-9)
+            scatter!(pl,  [times[s]], [l_com], marker=:x, color=:red, label="", markersize=3)
+            i += 1
+        end
+    end
+
+    ### --- Plot the lines --- ###
+    plot!(pl,  times, l_coms, color=:orange, label="Exact", lw=1)
+    plot!(pl, times, l_coms_fl, color=:green, label="FL approximate", style=:dash, lw=1)
+    return pl
+end
+
 function gif_x(sol, p; Nt=1000, fps=20, filename="xspaceEv.gif", every=10)
     times = sol.t ./ p.ω .* 1e3  # convert to ms
 
@@ -122,7 +175,7 @@ function gif_x(sol, p; Nt=1000, fps=20, filename="xspaceEv.gif", every=10)
     gif(anim, filename, fps=fps)
 end
 
-function gif_ρ(sol, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile="rho_phase.gif", every=5)
+function gif_ρ(sol, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile=false, every=5)
     times = sol.t ./ p.ω .* 1e3  # convert to ms
 
     state = similar(sol.u[1])
@@ -170,4 +223,89 @@ function gif_ρ(sol, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile="rho_p
 
         gif(anim_phase, phasefile, fps=fps)
     end
+end
+
+function gif_ρ_diag(sol, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile=false, every=5)
+    times = sol.t ./ p.ω .* 1e3  # convert to ms
+
+    state = diag(sol.u[1])
+    data_mag = similar(state)
+    data_phase = similar(state)
+    # Modulus
+    axes = 1:p.L
+    hm_mag = scatter(axes,  zeros(Float64, length(state)),
+        xlabel=L"λ", ylabel=L"|ρ(λ,λ)|",
+        color=:orange,
+        dpi=200, marker=:+,
+        ylims=(0., maximum(abs.(state))),
+        legend=false
+    )
+
+    anim_mag = @animate for s in 1:every:Nt
+        state .= diag(sol.u[s])
+        data_mag .= abs.(state)
+        hm_mag[1][1][:y] .= data_mag
+        hm_mag[1][:title] = "for k=(p.κ) (ħω) Diagonal elements of ρ(λ, λ) at t=$(Int(round(times[s]; digits=0))) ms"
+    end
+
+    gif(anim_mag, magfile, fps=fps)
+
+    if phasefile == false 
+        return nothing
+    else 
+        # phase
+        hm_phase = scatter(axes,  angle.(state),
+        xlabel=L"λ", ylabel=L"arg(ρ(λ,λ))",
+        color=:red,
+        dpi=200
+    )
+        
+        anim_phase = @animate for s in 1:every:Nt
+            state .= diag(sol.u[s])
+            data_phase .= angle.(state)
+
+            hm_phase[1][1][:y] .= data_phase
+            hm_phase[1][:title] = "θ = arg(ρ(λ,λ)) at t=$(Int(round(times[s]; digits=0))) ms"
+        end
+
+        gif(anim_phase, phasefile, fps=fps)
+    end
+end
+function gif_ρ_diag(sol, sol_FL, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile=false, every=5)
+    times = sol.t ./ p.ω .* 1e3  # convert to ms
+
+    state = diag(sol.u[1])
+    data_mag = similar(state)
+
+    # Modulus
+    axes = 1:p.L
+    hm_mag = scatter(axes,  zeros(Float64, length(state)),
+        xlabel=L"λ", ylabel=L"|ρ(λ,λ)|",
+        color=:orange,
+        dpi=200, marker=:+,
+        ylims=(0., maximum(abs.(state))),
+        label=L"U_{exact}"
+    )
+    scatter!(hm_mag, axes,  zeros(Float64, length(state)),
+        xlabel=L"λ", ylabel=L"|ρ(λ,λ)|",
+        color=:green,
+        dpi=200, marker=:x,
+        ylims=(0., maximum(abs.(state))), 
+        label=L"U_{Floquet}^{(0)}"
+    )
+
+    anim_mag = @animate for s in 1:every:Nt
+        state .= diag(sol.u[s])
+        data_mag .= abs.(state)
+        hm_mag[1][1][:y] .= data_mag
+        hm_mag[1][:title] = "Diagonal elements of ρ(λ, λ) at t=$(Int(round(times[s]; digits=0))) ms"
+
+        state .= diag(sol_FL.u[s])
+        data_mag .= abs.(state)
+        hm_mag[1][2][:y] .= data_mag
+    end
+
+    gif(anim_mag, magfile, fps=fps)
+
+    return nothing
 end

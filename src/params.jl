@@ -68,7 +68,7 @@ end
 
 # Construct a Params object from experimental parameters only
 function make_params(; ω=2π*440, Δ=2π*10, κ=0.1, ϕ=0, L=80, 
-                     T_exp=230e-9, t_i_exp=0.0, t_e_exp=0.1)
+                     T_exp=230e-9, t_i_exp=0.0, t_e_exp=0.1, f_t_symbol = :smooth)
 
     ħ = 1.054571817e-34
     m = 1.443e-25
@@ -83,9 +83,14 @@ function make_params(; ω=2π*440, Δ=2π*10, κ=0.1, ϕ=0, L=80,
     Temp = 1/E_ratio
     β = 1/Temp
 
-    # time-dependent functions
-    step(x) = x > 0 ? 1.0 + 0im : -1.0 - 0im
-    f_t(t) = κ * step(sin(ω_d * t + ϕ))
+    step(x) = x > 0 ? 1. : -1.
+    f_t = if f_t_symbol == :step
+        t -> κ * step(sin(ω_d * t + ϕ))
+    elseif f_t_symbol == :smooth
+        t -> κ * cos(ω_d * t + ϕ)
+    else
+        error("Unknown f_t_symbol: $f_t_symbol")
+    end
 
     # stroboscopic times
     strob_ts = tuple(collect(t_i:(2π/ω_d):t_e)...)
@@ -119,3 +124,30 @@ function update(p::Params; kwargs...)
                        t_i_exp=params[:t_i_exp], t_e_exp=params[:t_e_exp])
 end
 
+# Make a copy of a Params object
+function Base.copy(p::Params)
+    return Params(
+        p.ħ, p.m, p.lₕ,
+        p.ω, p.Δ, p.T_exp, p.t_i_exp, p.t_e_exp, p.ϕ, p.κ, p.L, p.f_t,
+        p.t_i, p.t_e, p.ω_d, p.Temp, p.β, p.strob_ts, p.save_ts
+    )
+end
+
+# Copy and update selected fields in one step
+function copy_with(p::Params; kwargs...)
+    # Start from a copy
+    newp = copy(p)
+
+    # Update fields if provided
+    for (k,v) in kwargs
+        if hasfield(Params, k)
+            setfield!(newp, k, v)
+        else
+            error("Params has no field named $k")
+        end
+    end
+
+    # Recompute dependent fields if necessary
+    # For your struct, best is to call `make_params` with updated experimental params
+    return update(newp; kwargs...)
+end

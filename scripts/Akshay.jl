@@ -1,5 +1,6 @@
 ## Should be all packages you need
 using FoSpDynamics
+using OrdinaryDiffEq
 using Plots
 using LinearAlgebra
 using LaTeXStrings
@@ -60,36 +61,36 @@ results = Dict()
 
 # loop for sweeping several driving strenghts
 # You can pick a function from Time_Evolution.jl to run (here are given the Floquet approximate sim, exact Time dependent sim or both)
+# please go to the Time_Evolution.jl file and change the Hamiltonians to the appropriate ones (here i use the Θ(x)*cos(ωt))
 for k in [.1]
     p = update(p; κ=k)
-    #results[k] = run_Exact(p, k)
-    #results[k] = run_Floquet(p, k)
-    #results[k] = run_both(p, k)
+    #results[k] = run_Exact(p)
+    results[k] = run_Floquet(p)
+    #results[k] = run_both(p)
 end
 
 jldsave("insert_your_file_name.jld2"; results, p)
-
+results[.1]
 ## Plot the com solution ##
 for k in [.1]
     sol = results[k]
     p = update(p; κ=k)
 
-    pl = plot_center_of_mass_wFL(sol, p)
+    # you can also give it two sols where the first will be labeled the exact sol and the second will be labeled fl
+    pl = plot_center_of_mass_λ(sol, p)
     display(pl)
 end
+display(pl)
 
 
 
 # Gif
 for k in [.1]
     sol_FL = results[k]
-    # if both Exact and FL 
-    #sol, sol_FL = results[k]
     p = update(p; κ=k)
 
-
+    # you can also give it two sols where the first will be labeled the exact sol and the second will be labeled fl
     gif_ρ_diag(sol_FL, p; Nt=div(total_t,1), magfile="Insert_name.gif",  every=5)
-    # if both Exact and FL 
-    #gif_ρ_diag(sol, sol_FL, p; Nt=div(total_t,1), magfile="Insert_name.gif",  every=5)
+    
 end
 

@@ -6,7 +6,7 @@ function check_conservation_of_probability(sol)
     return prob
 end
 
-function plot_center_of_mass(sol, p)
+function plot_center_of_masses(sol, p)
 
     ### --- Create empty plots --- ###
     pl = plot(
@@ -83,7 +83,7 @@ function plot_center_of_mass(sol, p)
     return pl, pl2, pl3, pl4
 end
 
-function plot_center_of_mass_wFL(sols, p)
+function plot_center_of_mass_λ(sol, p)
 
     ### --- Create empty plots --- ###
     pl = plot(
@@ -92,8 +92,48 @@ function plot_center_of_mass_wFL(sols, p)
         title  = "Center of mass motion λ-space for k=$(p.κ) (ħω)",
         legend = true, grid = true, framestyle = :box
     )
-    sol = sols[1]
-    sol_fl = sols[2]
+
+    # Pre-allocate
+    times = [sol.t[s] / p.ω * 1e3 for s in eachindex(sol.t)]
+    l_coms = Float64[]
+
+
+    # Add legend entries for stroboscopic markers
+    scatter!(pl,  [NaN], [NaN], color=:red, marker=:x, label="Stroboscopic")
+
+    i = 1
+
+    ### --- Main loop --- ###
+    for s in eachindex(sol.t)
+        state = sol.u[s]
+
+
+        l_com = real(tr(state * Diagonal(0:(p.L-1))))
+        push!(l_coms, l_com)
+
+
+        # stroboscopic points
+        if i ≤ length(p.strob_ts) && isapprox(sol.t[s], p.strob_ts[i]; atol=1e-9)
+            scatter!(pl,  [times[s]], [l_com], marker=:x, color=:red, label="", markersize=3)
+            i += 1
+        end
+    end
+
+    ### --- Plot the lines --- ###
+    plot!(pl,  times, l_coms, color=:orange, label="Exact", lw=1)
+    return pl
+end
+
+function plot_center_of_mass_λ(sol, sol_fl, p)
+
+    ### --- Create empty plots --- ###
+    pl = plot(
+        xlabel = L"$t\; (ms)$",
+        ylabel = L"$\langle \lambda  \rangle$",
+        title  = "Center of mass motion λ-space for k=$(p.κ) (ħω)",
+        legend = true, grid = true, framestyle = :box
+    )
+
     # Pre-allocate
     times = [sol.t[s] / p.ω * 1e3 for s in eachindex(sol.t)]
     l_coms = Float64[]
@@ -127,6 +167,7 @@ function plot_center_of_mass_wFL(sols, p)
     plot!(pl, times, l_coms_fl, color=:green, label="FL approximate", style=:dash, lw=1)
     return pl
 end
+
 
 function gif_x(sol, p; Nt=1000, fps=20, filename="xspaceEv.gif", every=10)
     times = sol.t ./ p.ω .* 1e3  # convert to ms

@@ -1,7 +1,15 @@
 # these are in particular for varying 
 
 function run_Exact(p)
-    
+    Hx = construct_hamiltonians_Heaviside_x(p.L) 
+    f_ts = (t-> one(ComplexF64), p.f_t)
+    ops = Hx
+
+    t1 = time()
+    sol = Time_Evolution_thermal_ρ_TD_VN(copy(ρ), ops, f_ts, (p.t_i,p.t_e), p.save_ts; rtol = 1e-10, atol = 1e-10, solver = Vern7())
+    t2 = time()
+
+    println("Simulation time for Exact with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
 end
 
 function run_Floquet(p)

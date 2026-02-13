@@ -20,6 +20,8 @@ p.L
 
 ### initial state ###
 Hx= construct_hamiltonians_uniform(p.L)
+Hx[2]
+p.κ
 ρ = thermal_ρ_matrix(Hx[1], p.β)
 Hx[2]
 # Convert density matrix to x-space

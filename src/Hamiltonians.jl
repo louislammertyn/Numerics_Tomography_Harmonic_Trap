@@ -1,4 +1,4 @@
-function construct_hamiltonians(L)
+function construct_hamiltonians_Heaviside_x(L)
     ## initialisation of lattice and hilbert space ##
     geometry = (L,)
     V = U1FockSpace(geometry, 1,1)
@@ -44,7 +44,7 @@ function construct_hamiltonians(L)
 end
 
 begin
-    function construct_hamiltonians_FL(p, xz=false, aspectratio=1.)
+    function construct_hamiltonians_FL_Heaviside_x(p, xz=false, aspectratio=1.)
     ## initialisation of lattice and hilbert space ##
     L = p.L
     geometry = (L,)
@@ -135,7 +135,7 @@ end
 
 
 
-function construct_hamiltonians_FL_uniform(p, xz=false, aspectratio=1.)
+function construct_hamiltonians_FL_uniform(p)
 ## initialisation of lattice and hilbert space ##
 L = p.L
 geometry = (L,)
@@ -182,7 +182,7 @@ return (Hx_onsite_m, Hx_hop_m)
 end
 
 
-function construct_hamiltonians_FL_2drives(p, phi, m, drive_strength, xz=false, aspectratio=1.)
+function construct_hamiltonians_FL_2drives(p, phi, m, drive_strength)
     H_onsite_m, H_hop1_m = construct_hamiltonians_FL(p,xz,aspectratio)
 
     function fhop2x(sites_tuple) 

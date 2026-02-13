@@ -9,14 +9,15 @@ using JLD2
 include("../src/utils.jl")
 include("../src/params.jl")
 include("../src/Hamiltonians.jl")
+include("../src/Time_Evolutions.jl")
 include("../src/Processing.jl")
 include("../src/Observables.jl")
 
 
-# experimental parameters (see params.jl file for details) basically you give experimental values
-# it then sets all units such that ħ = ω = m = 1
+# give experimental parameters in SI units (see params.jl file for details) 
+# it then gives the params such that ħ = ω = m = 1
 # see also it's printed output
-p = make_params(;Δ=0., t_e_exp=0.027, L = 100, T_exp=150e-9, f_t_symbol=:smooth)
+p = make_params(;Δ=0., t_e_exp=0.08, L = 100, T_exp=150e-9, f_t_symbol=:smooth)
 
 # parameters can be updated with the update(p; ...) function
 

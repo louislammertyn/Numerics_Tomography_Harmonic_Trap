@@ -1,4 +1,4 @@
-using Trapz, ProgressMeter
+
 ############################################
 # EFFICIENT HERMITE FUNCTIONS
 ############################################
@@ -46,7 +46,7 @@ function interaction_matrix(λmax, xs, hs; fl=false)
     return U
 end
 
-function hopping_integral(λ1::Int64, λ2::Int64)
+function step_hopping_integral(λ1::Int64, λ2::Int64)
     xs = range(start=0., stop=20., length= 2000)
     h1 = hermite.(λ1, xs)
     h2 = hermite.(λ2, xs)
@@ -54,6 +54,9 @@ function hopping_integral(λ1::Int64, λ2::Int64)
 
     return double_hermite_integral(h1, h2, xs)
 end
+
+theta(x, x1, x2) = (x>x1 && x<x2) ? one(Float64) : zero(Float64)
+walls(x, width, a) = (theta(x, -a - width/2,-a+width/2) + theta(x, a-width/2, a+width/2)) 
 
 
 ############################################
@@ -88,39 +91,55 @@ end
 
 
 
-
-
 function density_x(ρ::Matrix{ComplexF64}, hs::Matrix{Float64})
     return hs * ρ * hs'
 end
 
-
-function density_x_matrix(ρ::Matrix{ComplexF64}; grid=2000, xlims=(-15,15))
-    N = size(ρ, 1)
-    xs = LinRange(xlims[1], xlims[2], grid)
-
-    # Precompute Hermite functions
-    hs = zeros(Float64, grid, N)
-    for n in 1:N
-        hs[:, n] = hermite.(n-1, xs)
-    end
-
-    # Compute x-space density
-    ρ_x = density_x(ρ, hs)  # assume you have a density_x function
-
-    return xs, ρ_x
+function density_p(ρ::Matrix{ComplexF64}, hs_p::Matrix{ComplexF64})
+    return hs_p * ρ * hs_p'
 end
 
-function density_λ_matrix(ρ_x::Matrix{ComplexF64}, xs::AbstractVector, N::Int)
-    grid = length(xs)
-    dx = xs[2] - xs[1]
 
-    # Precompute Hermite functions
-    hs = zeros(Float64, grid, N)
-    for n in 1:N
-        hs[:, n] = hermite.(n-1, xs)
+
+function free_evolve_p_matrix(
+    ρ_p::Matrix{ComplexF64},
+    ps::AbstractVector,
+    t::Float64
+)
+    N = length(ps)
+    ρ_p_t = similar(ρ_p)
+
+    # Phase factors exp(-i p^2 t / 2)
+    phases = exp.(-1im .* ps.^2 .* t ./ 2)
+
+    for i in 1:N, j in 1:N
+        ρ_p_t[i, j] = phases[i] * ρ_p[i, j] * conj(phases[j])
     end
 
+    return ρ_p_t
+end
+
+function free_evolve_λ_matrix(
+    ρ_λ::Matrix{ComplexF64},
+    t::Float64
+)
+    N = size(ρ_λ, 1)
+    ρ_t = similar(ρ_λ)
+
+    # Phase factors exp(-i ω (n + 1/2) t)
+    phases = exp.(-1im .* ((0:N-1) .+ 0.5) .* t)
+
+    for n in 1:N, m in 1:N
+        ρ_t[n, m] = phases[n] * ρ_λ[n, m] * conj(phases[m])
+    end
+
+    return ρ_t
+end
+
+
+function density_λ_matrix(ρ_x::Matrix{ComplexF64}, xs::AbstractVector, N::Int, hs::Matrix{Float64})
+    grid = length(xs)
+    dx = xs[2] - xs[1]
     # Integrate to compute Fock-space density matrix
     ρ_fock = zeros(ComplexF64, N, N)
     for n in 1:N, m in 1:N
@@ -129,6 +148,31 @@ function density_λ_matrix(ρ_x::Matrix{ComplexF64}, xs::AbstractVector, N::Int)
     end
 
     return ρ_fock
+end
+
+function density_λ_matrix_from_p(
+    ρ_p::Matrix{ComplexF64},
+    ps::AbstractVector,
+    N::Int,
+    hs_p::Matrix{ComplexF64}
+)
+    dp = ps[2] - ps[1]
+
+    ρ_fock = zeros(ComplexF64, N, N)
+    for n in 1:N, m in 1:N
+        ρ_fock[n, m] =
+            sum(hs_p[:, n] .* (ρ_p * hs_p[:, m])) * dp^2
+    end
+
+    return ρ_fock
+end
+
+function density_x_matrix_from_p(ρ_p::Matrix{ComplexF64},
+                                 xs::AbstractVector,
+                                 ps::AbstractVector)
+    dp = ps[2] - ps[1]
+    E = exp.(1im .* xs .* ps' )
+    return E * ρ_p * E' .*  dp^2 / (2π)
 end
 
 function density_x_diag(ρ::Matrix{ComplexF64}, xs::AbstractVector, hs::AbstractMatrix)

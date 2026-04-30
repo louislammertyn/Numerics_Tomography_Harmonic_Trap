@@ -67,7 +67,7 @@ function Base.show(io::IO, p::Params)
 end
 
 # Construct a Params object from experimental parameters only
-function make_params(; ω=2π*440, Δ=2π*10, κ=0.1, ϕ=0, L=80, 
+function make_params(; ω=2π*440, Δ=2π*14.54, κ=0.1, ϕ=0, L=80, 
                      T_exp=230e-9, t_i_exp=0.0, t_e_exp=0.1, f_t_symbol = :smooth)
 
     ħ = 1.054571817e-34
@@ -85,9 +85,9 @@ function make_params(; ω=2π*440, Δ=2π*10, κ=0.1, ϕ=0, L=80,
 
     step(x) = x > 0 ? 1. : -1.
     f_t = if f_t_symbol == :step
-        t -> κ * step(sin(ω_d * t + ϕ))
+        t ->  step(sin(ω_d * t + ϕ))
     elseif f_t_symbol == :smooth
-        t -> κ * cos(ω_d * t + ϕ)
+        t -> cos(ω_d * t + ϕ)
     else
         error("Unknown f_t_symbol: $f_t_symbol")
     end

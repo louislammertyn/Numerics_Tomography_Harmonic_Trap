@@ -120,7 +120,7 @@ function plot_center_of_mass_λ(sol, p)
     end
 
     ### --- Plot the lines --- ###
-    plot!(pl,  times, l_coms, color=:orange, label="Exact", lw=1)
+    plot!(pl,  times, l_coms, color=:grey, label="Exact", lw=1)
     return pl
 end
 

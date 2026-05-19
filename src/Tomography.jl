@@ -55,13 +55,14 @@ begin ## TOMOGRAPHY
 	    # compute the time-filtered signal F(x, k)
 	    F = zeros(ComplexF64, nx)
 	    for i in 1:nt
-	        F .+= densities[i] .* exp(1im * t_holds[i] * k)
+	        F .+= densities[i] .* exp(-1im * t_holds[i] * k)
 	    end
 	    F ./= nt
 
 		# projection of F onto Hermite basis
 	    # f[m] = ∫ dx F(x, k) ψ_m(x/b)
-	    Φ = hcat([hermite_function_basis(λmax, x / b) for x in xs]...)
+		Φ = hcat([hermite.(n, xs ./ b) for n in 0:λmax-1]...)'
+	    #Φ = hcat([hermite_function_basis(λmax, x / b) for x in xs]...)
 	    f = [trapz(xs, F .* Φ[m, :]) for m in 1:λmax]
 
 		# projection of kernel onto Hermite basis
@@ -85,4 +86,13 @@ begin ## TOMOGRAPHY
 	
 	    return pinv(M) * f
 	end
+
+	
+
+
+
+
+
+
+
 end

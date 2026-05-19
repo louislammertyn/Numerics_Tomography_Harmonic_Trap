@@ -1,15 +1,5 @@
-using FoSpDynamics
-using Plots, ColorSchemes
-using LinearAlgebra
-using OrdinaryDiffEq
-using LaTeXStrings
-using JLD2
-
-include("../src/utils.jl")
-include("../src/params.jl")
-include("../src/Hamiltonians.jl")
-include("../src/Processing.jl")
-include("../src/Observables.jl")
+using Revise 
+using ExpSynthDim
 
 
 

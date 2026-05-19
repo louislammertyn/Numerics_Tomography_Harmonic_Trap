@@ -2,7 +2,7 @@
 ############################################
 # EFFICIENT HERMITE FUNCTIONS
 ############################################
-function hermite(n, x)
+function hermite(n::Int, x::Float64)
     iszero(n) && return (π)^(-0.25) * exp(-x^2 / 2)
     isone(n) && return sqrt(2) * x * π^(-0.25) * exp(-x^2 / 2)
 
@@ -60,7 +60,7 @@ walls(x, width, a) = (theta(x, -a - width/2,-a+width/2) + theta(x, a-width/2, a+
 
 
 ############################################
-function thermal_ρ_matrix(H::Matrix{ComplexF64}, β::Float64)
+function thermal_state(H::Matrix{ComplexF64}, β::Float64)
     @assert H == H' "H is not Hermitian"
 
     # Diagonalize
@@ -104,30 +104,28 @@ end
 function free_evolve_p_matrix(
     ρ_p::Matrix{ComplexF64},
     ps::AbstractVector,
-    t::Float64
+    t::Float64,
+    phases::AbstractVector
 )
-    N = length(ps)
-    ρ_p_t = similar(ρ_p)
-
-    # Phase factors exp(-i p^2 t / 2)
-    phases = exp.(-1im .* ps.^2 .* t ./ 2)
-
-    for i in 1:N, j in 1:N
-        ρ_p_t[i, j] = phases[i] * ρ_p[i, j] * conj(phases[j])
+    
+    phases .= exp.(-1im .* ps.^2 .* t ./ 2)
+    
+    for i in axes(ρ_p,1), j in axes(ρ_p,2)
+        ρ_p[i,j] =  phases[i] * ρ_p[i,j] * conj(phases[j])
     end
-
-    return ρ_p_t
+    return ρ_p
 end
 
 function free_evolve_λ_matrix(
     ρ_λ::Matrix{ComplexF64},
-    t::Float64
+    t::Float64; 
+    ω::Float64=1.
 )
     N = size(ρ_λ, 1)
     ρ_t = similar(ρ_λ)
 
     # Phase factors exp(-i ω (n + 1/2) t)
-    phases = exp.(-1im .* ((0:N-1) .+ 0.5) .* t)
+    phases = exp.(-1im .* ((0:N-1) .+ 0.5) .* ω .* t)
 
     for n in 1:N, m in 1:N
         ρ_t[n, m] = phases[n] * ρ_λ[n, m] * conj(phases[m])
@@ -167,12 +165,77 @@ function density_λ_matrix_from_p(
     return ρ_fock
 end
 
-function density_x_matrix_from_p(ρ_p::Matrix{ComplexF64},
-                                 xs::AbstractVector,
-                                 ps::AbstractVector)
-    dp = ps[2] - ps[1]
-    E = exp.(1im .* xs .* ps' )
-    return E * ρ_p * E' .*  dp^2 / (2π)
+
+function density_x_matrix_from_p!(
+    ρ_x::Matrix{ComplexF64},
+    ρ_p::Matrix{ComplexF64},
+    Exponents::Matrix{ComplexF64},
+    dp::Float64
+)
+
+    tmp = similar(ρ_x)                # size (nx × np)
+    mul!(tmp, Exponents, ρ_p)         # tmp = Exponents * ρ_p
+    mul!(ρ_x, tmp, Exponents')
+    ρ_x .*= dp^2 / (2π)
+    return ρ_x
+end
+
+
+
+function density_x_diagonal_from_p_fft(
+    ρ_p::Matrix{ComplexF64},
+    dp::Float64,
+    xs::AbstractVector
+)
+    N = size(ρ_p, 1)
+    @assert size(ρ_p, 2) == N
+
+    # 1) Build non-circulant diagonal sums s_d for d = -(N-1) ... (N-1)
+    s = zeros(ComplexF64, 2N - 1)
+    @inbounds for j in 1:N
+        for k in 1:N
+            d = j - k                      # in [-(N-1), ..., (N-1)]
+            s[d + N] += ρ_p[j, k]          # index shift so d=0 -> s[N]
+        end
+    end
+
+    # 2) Embed into an even-length array for clean FFT periodicity
+    M = 2N
+    S = zeros(ComplexF64, M)
+    S[1:(2N - 1)] .= s
+
+    # 3) FFT with correct centering
+    F = ifft(fftshift(S)) .*M
+    F = fftshift(F)
+
+    # 4) Your normalization (keep if it matches your continuum convention)
+    F .*= dp^2 / (2π)
+
+    # 5) Dual x-grid consistent with FFT length M
+    xs_fft = (2π / (M * dp)) .* collect(-(M ÷ 2):(M - M ÷ 2 - 1))
+
+    # 6) Interpolate to requested xs
+    @assert (minimum(xs_fft) <= minimum(xs)) && (maximum(xs_fft) >= maximum(xs)) ||
+        error("fft grid is too small, increase amount of samples (M) or shrink xs range")
+
+    interp = interpolate((xs_fft,), F, Gridded(Linear()))
+    ρx_diag = interp.(xs)
+
+    return ρx_diag
+end
+
+
+function set_pixels(ρx_diag::AbstractVector, pixels::Int64)
+    # Average values per pixel
+    N = length(ρx_diag)
+    dpix = div(N, pixels)
+    ρx_diag_av = zeros(Float64, pixels)
+
+    for i in 1:pixels 
+        ρx_diag_av[i] = sum([ρx_diag[i+n] for n in 1:dpix-1]) / dpix 
+    end
+
+    return ρx_diag_av 
 end
 
 function density_x_diag(ρ::Matrix{ComplexF64}, xs::AbstractVector, hs::AbstractMatrix)

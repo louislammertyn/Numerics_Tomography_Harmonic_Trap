@@ -312,8 +312,11 @@ function gif_ρ_diag(sol, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile=f
         gif(anim_phase, phasefile, fps=fps)
     end
 end
-function gif_ρ_diag(sol, sol_FL, p; Nt=1000, fps=20, magfile="rho_mag.gif", phasefile=false, every=5)
+function gif_ρ_diag(sol, sol_FL, p; Nt=5000, fps=20, magfile="rho_mag.gif", phasefile=false, every=10)
     times = sol.t ./ p.ω .* 1e3  # convert to ms
+    if Nt> length(times)
+        Nt= length(times)
+    end
 
     state = diag(sol.u[1])
     data_mag = similar(state)

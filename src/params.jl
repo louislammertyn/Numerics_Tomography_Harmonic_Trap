@@ -1,5 +1,4 @@
-## Experimental parameters ##
-include("./utils.jl")
+
 
 struct Params
     # physical constants

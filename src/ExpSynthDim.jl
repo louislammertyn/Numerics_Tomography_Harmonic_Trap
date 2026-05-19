@@ -1,10 +1,10 @@
 module ExpSynthDim 
 
 using FoSpCore, FoSpDynamics, FoSpFloquet
-using Plots, LinearAlgebra 
+using Plots, LinearAlgebra, FFTW, Interpolations
 using ProgressMeter, LaTeXStrings
 using Trapz, FastGaussQuadrature
-using JLD2 
+using JLD2
 
 
 include("./Hamiltonians.jl")
@@ -13,6 +13,8 @@ include("./params.jl")
 include("./Processing.jl")
 include("./Tomography.jl")
 include("./utils.jl")
+include("./errors.jl")
+include("./Exp_realism.jl")
 
 
 ##############################################################
@@ -30,7 +32,8 @@ export HO_matrix,
 export x_matrix_ho,
        p_matrix_ho,
        a_matrix_ho,
-       ad_matrix_ho
+       ad_matrix_ho,
+       local_currents
 
 
 ###############################################################
@@ -65,7 +68,7 @@ export hermite_prod_integral,
 export hermite,
        interaction_matrix,
        step_hopping_integral,
-       thermal_ρ_matrix,
+       thermal_state,
        lambda_com,
        density_x,
        density_p,
@@ -73,11 +76,26 @@ export hermite,
        free_evolve_λ_matrix,
        density_λ_matrix,
        density_λ_matrix_from_p,
-       density_x_matrix_from_p,
+       density_x_matrix_from_p!,
+       density_x_diagonal_from_p_fft,
        density_x_diag,
        Displacement_op,
        translate_density_x,
        compare_energies,
        gaussian_diag_matrix,
-       plot_density_matrix_errors
+       plot_density_matrix_errors,
+       theta,
+       walls
+
+###############################################################
+
+export reconstruct_density_matrix_slice, get_n_tof, convolve_gaussian, scaled_hs, bin_pixels
+
+###############################################################
+
+export almost_thermal
+
+###############################################################
+
+export t_holds_ideal, quantize_times, scaled_hs, convolve_gaussian, get_n_tof, get_n_tof_optimized, Kernel, bin_pixels
 end

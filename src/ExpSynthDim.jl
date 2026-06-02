@@ -24,7 +24,8 @@ export HO_matrix,
        drive_elements,
        get_only_m_site_hopping,
        drive_Coherent_FL,
-       uniform_Ham
+       uniform_Ham,
+       V_AOD_FL
 
 ###############################################################
 

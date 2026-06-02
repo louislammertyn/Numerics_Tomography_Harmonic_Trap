@@ -152,4 +152,9 @@ function bin_pixels(density, xs, Δx_pix)
     end
 
     return density_pix, xs_pix
+
+    function add_OD_noise(OD_sim; N_photon, I0)
+
+        
+    end
 end

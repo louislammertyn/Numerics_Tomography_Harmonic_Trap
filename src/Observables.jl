@@ -27,10 +27,11 @@ function ad_matrix_ho(L::Int)
     return a_matrix_ho(L::Int)'
 end
 
+# J(i → j)
 function local_currents(ρ::Matrix{ComplexF64}, H::Matrix{ComplexF64})
     J = similar(ρ)
     for i in axes(J,1), j in axes(J,2)
-        J[i,j] = 2* imag(H[i,j] * ρ[j,i])
+        J[i,j] = -2* imag(H[i,j] * ρ[j,i])
     end
     return J
 end

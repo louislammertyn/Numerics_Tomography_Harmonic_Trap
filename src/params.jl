@@ -1,5 +1,3 @@
-
-
 struct Params
     # physical constants
     ħ::Float64
@@ -66,7 +64,7 @@ function Base.show(io::IO, p::Params)
 end
 
 # Construct a Params object from experimental parameters only
-function make_params(; ω=2π*440, Δ=2π*14.54, κ=0.1, ϕ=0, L=80, 
+function make_params(; ω=2π*440, Δ=-2π*14.54545454, κ=0.1, ϕ=0, L=80, 
                      T_exp=230e-9, t_i_exp=0.0, t_e_exp=0.1, f_t_symbol = :smooth)
 
     ħ = 1.054571817e-34

@@ -84,7 +84,7 @@ idx = round.(Int, range(1, total_simsteps, 10))[6]
 t_shot = sol.t[idx] ./p.ω
 
 
-N_holds = 6:2:22
+N_holds = 6:22
 data_N_hold = Array{AbstractVector}(undef, size(N_holds))
 
 for id_N_hold in eachindex(N_holds)
@@ -92,10 +92,9 @@ for id_N_hold in eachindex(N_holds)
     N = N_holds[id_N_hold]
 
     t_ideal = N < 23 ? t_holds_ideal(1., N) : t_holds_ideal(1. / 2, N)
-    #t_quant = quantize_times(t_ideal, Δt)
-    t_quant = vcat([n * Δt for n in 0:N/2] , [2π - n*Δt for n in 1:N/2])
+    t_quant = quantize_times(t_ideal, Δt)
     
-    println(t_quant)#println("experimental hold times:\n")
+    #println("experimental hold times:\n")
     #[println("$(round(t /p.ω *1e3;digits=1)) ms") for t  in t_quant]
 
     # store one error vector per shot (indexed by k)
@@ -104,8 +103,8 @@ for id_N_hold in eachindex(N_holds)
     for t_tof in t_tofs
 
         densities_tof = get_n_tof_optimized(ρ_shot, t_quant, t_tof, xs, hs)
-        densities_convolved = [convolve_gaussian(densities_tof[i], xs, σ) for i in 1:2*N+1]
-        densities_pixelated = [bin_pixels(densities_convolved[i], xs, pixel_width)[1] for i in 1:2*N+1]
+        densities_convolved = [convolve_gaussian(densities_tof[i], xs, σ) for i in 1:length(t_quant)]
+        densities_pixelated = [bin_pixels(densities_convolved[i], xs, pixel_width)[1] for i in 1:length(t_quant)]
         xs_pixelated = bin_pixels(densities_convolved[1], xs, pixel_width)[2]
         
         xs_ = xs_pixelated

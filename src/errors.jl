@@ -5,9 +5,9 @@ function almost_thermal(
 )
     N = size(ρ_th, 1)
 
-    # Hermitian banded generator
+    # Hermitian perturbation
     A = zeros(ComplexF64, N, N)
-    for i in 1:N, j in i:N
+    for i in 1:N, j in i+1:N
         w = exp(-abs(j - i) / ξ)
         v = randn() + 1im * randn()
         A[i,j] = w * v

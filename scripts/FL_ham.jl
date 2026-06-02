@@ -4,16 +4,11 @@ using LinearAlgebra
 using OrdinaryDiffEq
 using LaTeXStrings
 using JLD2
-
-include("../src/utils.jl")
-include("../src/params.jl")
-include("../src/Hamiltonians.jl")
-include("../src/Processing.jl")
-include("../src/Observables.jl")
+using ExpSynthDim
 
 # experimental parameters
 begin 
-p = make_params(;κ=1, Δ=2π*44, t_e_exp=0.08, L = 50, T_exp=150e-9, f_t_symbol=:smooth)
+p = make_params(;κ=1, t_e_exp=0.08, L = 50, T_exp=150e-9, f_t_symbol=:smooth)
 xs = LinRange(-20,20,2000)
 f(x) = theta(x,0,20)
 p.κ

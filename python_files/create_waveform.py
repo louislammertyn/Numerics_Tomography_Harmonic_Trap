@@ -1512,7 +1512,7 @@ def example_synth_dim(exp_dur_ms=30, i_ref=1.25e-5, detuning=14.54545454, xfreq=
     return {key: getattr(synth_exp, key) for key in synth_exp.print_params}, drive
 
 
-def example_synth_dim_2drive(nfreq2=3, k2=1, exp_dur_ms=100, i_ref=1.25e-5, detuning=14.54545454, xfreq=52.5, yfreq=52.5, awg_file_name=None, t_ramp_ms=None):
+def example_synth_dim_2drive(phase=0, nfreq2=3, k2=1, exp_dur_ms=100, i_ref=1.25e-5, detuning=0, xfreq=52.5, yfreq=52.5, awg_file_name=None, t_ramp_ms=None):
     size_y = 5 # µm Keep this small as pattern is constant in this direction
     size_x = 15 # µm
     freq = 440 + detuning # Hz
@@ -1527,7 +1527,7 @@ def example_synth_dim_2drive(nfreq2=3, k2=1, exp_dur_ms=100, i_ref=1.25e-5, detu
         t %= period_us
         
         #return np.heaviside(np.sign(period_us/2 -t)*x, 0.5) # Step function in time
-        return (1+np.sin(2*np.pi*t / period_us))*np.heaviside(x, 0.5) /2 + (1-np.sin(2*np.pi*t/period_us))*np.heaviside(-x, 0.5) /2 + k2*(1+np.sin(2*np.pi*t / period_us))*np.heaviside(x, 0.5) /2 + (1-np.sin(2*np.pi*t/period_us))*np.heaviside(-x, 0.5) /2 
+        return (1 + np.sin(2*np.pi*t / period_us) + 3.02 * np.sin(3*2*np.pi*t/period_us + phase))*np.heaviside(x, 0.5) /2 + (1 - np.sin(2*np.pi*t/period_us) - 3.02 * np.sin(3*2*np.pi*t/period_us + phase))*np.heaviside(-x, 0.5) /2 + 2
 
 
     t_list = [time.time()] # to profile where time is spent

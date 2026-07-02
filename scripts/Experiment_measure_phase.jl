@@ -3,15 +3,15 @@ using ExpSynthDim
 
 
 
-phis =  LinRange(0,π, 10)[1:9] 
+phis =  LinRange(0,π, 2)
 measured_phis = []
 measured_spreads= []
 
 for ϕ in phis
 # set parameters 
 begin
-    p = make_params(;κ=0.1, Δ=14, t_e_exp=0.05, L = 50, T_exp=100e-9, f_t_symbol=:smooth)
-    harmonics_and_phases =  [(1, 0.), (3, ϕ)]
+    p = make_params(;κ=1., Δ=0, t_e_exp=0.05, L = 80, T_exp=250e-9, f_t_symbol=:smooth)
+    harmonics_and_phases_and_amplitudes =  [(1, 0., 1.), (3, ϕ, 3.)]
     xs = LinRange(-60,60,8000)
     ps = LinRange(-60, 60,8000)
     hs = hcat([hermite.(n, xs) for n in 0:p.L-1]...)
@@ -32,13 +32,13 @@ end
 
 # initial state
 begin 
-    ρ = thermal_ρ_matrix(H_ho, p.β)
+    ρ = thermal_state(H_ho, p.β)
     plot(0:p.L-1, abs.(diag(ρ)), color=:red,framestyle=:box, xlabel="λ", ylabel="|ρ(λ, λ)|", label="$(p.T_exp * 1e9) nK",marker=:o,seriestype=:sticks)
 end
 
 # simulate driven time evolution
 begin 
-    drive(t) = sum([p.f_t(harm * t + ϕ) for (harm, ϕ) in harmonics_and_phases])
+    drive(t) = sum([ampl * sin(harm * t + ϕ) for (harm, ϕ, ampl) in harmonics_and_phases_and_amplitudes])
     ops = (H_ho, V_d)
     f_ts = (_-> 1, drive)
 
@@ -59,10 +59,32 @@ begin
 
 end
 
-# show results in situ
-plot_center_of_mass_λ(sol, sol_fl, p)
-#gif_ρ_diag(sol, p)
+begin 
+ρ_sol = sol.u[101]
 
+pl = plot(
+    xlabel = "λ",
+    ylabel = "|ρ(λ, λ + δλ)|",
+    title = "Magnitude of Density Matrix off-diagonals",
+    legend = :topright,
+    lw = 2
+)
+
+for k in 1:3
+    d = diag(ρ_sol, k)
+    plot!(
+        pl,
+        1:length(d),
+        real.(d),
+        label = "δλ = $k",
+        marker="o",
+        markersize=2.5,
+        markerstrokewidth=0.1
+    )
+end
+
+display(pl)
+end
 
 
 

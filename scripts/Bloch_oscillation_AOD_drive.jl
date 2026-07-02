@@ -5,12 +5,12 @@ using Statistics
 using OrdinaryDiffEq
 using FoSpDynamics
 using NPZ 
-
-frames = npzread("C:/Users/loulamme/OneDrive - UGent/Documenten/Assistent ELIS/Phd Research/projects/Exp_SynthDim_HarmTrap/code/python_files/patterns.npy")
+iref_to_k(3e-5)
+frames = npzread("C:/Users/loulamme/OneDrive - UGent/Documenten/Assistent ELIS/Phd Research/projects/Exp_SynthDim_HarmTrap/code/data/pattern_single_drive.npy")
 timesteps_per_drive = size(frames)[1]
 # Experimental and physical parameters
 begin
-    p = make_params(; κ=1., L=80, T_exp=250e-9, t_e_exp= 0.1,)
+    p = make_params(; κ=iref_to_k(4e-5), L=60, T_exp=250e-9, t_e_exp= 0.1,)
     xs_μm =  LinRange(-10, 10, 5000)
     xs = xs_μm .*1e-6 ./p.lₕ 
     
@@ -57,21 +57,26 @@ begin
     end
 
     gif(anim, "animation_AOD_drive.gif", fps=30)
+end
+begin
 
     V_d_approx = p.κ .* drive_elements(xs, step, p.L)
     H_fl = RWA_FL_Hamiltonian(V_d_approx, p, harmonics_and_phases, :smooth)
     V_fl = V_AOD_FL(drive, p)
-    H_AOD_fl = HO_matrix(p.L, p.Δ) + V_fl
+    H_AOD_fl = HO_matrix(p.L, p.Δ / p.ω) + V_fl
 end
 
+
 begin
-    ρ = npzread("./data/initial_state.npy")[1:p.L,1:p.L]
-    #ρ = thermal_state(H_ho, p.β)
+    #ρ = npzread("./data/initial_state.npy")[1:p.L,1:p.L]
+    ρ = thermal_state(H_ho, p.β)
     #ρ = almost_thermal(ρ, 4., 2.)
     plot(0:p.L-1, abs.(diag(ρ)), color=:red,framestyle=:box, xlabel="λ", ylabel="|ρ(λ, λ)|", label="$(p.T_exp * 1e9) nK",marker=:o,seriestype=:sticks)
     
 end
 
+H_fl
+V_fl
 # run bloch oscillations 
 begin 
     
@@ -84,7 +89,7 @@ begin
     println("Simulation time for exact dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
 
     # why does this not work with H_AOD_fl????
-    ops = (H_fl,)
+    ops = (H_AOD_fl,)
     f_ts = (_-> 1,)
 
     t1  = time()
@@ -95,6 +100,54 @@ begin
     println("Simulation time for Floquet dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
 
 end
+
+begin
+    _, idt34 = findmin(ts -> abs2.(ts.- (34e-3 .* p.ω )), sol.t)
+        _, idt69 = findmin(ts -> abs2.(ts.- (69e-3 .* p.ω )), sol.t)
+
+
+        ρ34 = sol.u[idt34]
+        ρ69 = sol.u[idt69]
+
+        com34 = sum([ρ34[i,i] * (i-1) for i in 1:p.L])
+        com69 = sum([ρ69[i,i] * (i-1) for i in 1:p.L])
+
+end
+com34 - com69
+pl = plot_center_of_mass_λ(sol, sol_fl, p)
+plot!(pl, data_exp[:,1], data_exp[:,2], yerror=data_exp[:,3],color=:blue,  label="Experiment", marker=:o, markerstrokewidth=1)
+
+
+data_num_ex = center_of_mass_evolution(sol, p)
+data_num_eff = center_of_mass_evolution(sol_fl, p)
+data_num_ex[:,1] .*= 1e3 / p.ω
+data_num_eff[:,1] .*= 1e3 / p.ω
+
+data_exp = [
+    2.2   11.858909037431372  0.7217373168802633;
+    13.2  14.340743794888574  1.810665402895463;
+    24.2  18.356888596357454  1.3361105414420893;
+    35.0  20.003817015854096  0.9574618297611185;
+    41.8  18.953989614325458  2.6321437735684627;
+    48.4  16.646149972042068  0.862230455726438;
+    55.0  14.562037035027348  0.5644882032223157;
+    61.6  12.198346534580427  1.877113564436251;
+    63.8  11.719942854180898  1.7653411878428773;
+    66.0  11.397837224799222  1.3401859284698108;
+    68.2  11.9636451046607    0.5268170105861274;
+    74.8  12.665404596671486  0.2688325507588324;
+    81.4  13.988014061497092  0.8502914972887096;
+    88.0  16.429113423284946  1.0061751734222992;
+    94.6  17.23315515282696   1.442540122611133
+]
+
+
+npzwrite("results_bo_comparison.npz", Dict(
+    "num_ex" => data_num_ex,
+    "num_eff" => data_num_eff,
+    "exp" => data_exp
+))
+
 
 begin
     t_targets =[2.2, 11., 19.8, 30.8, 39.6, 50.6, 59.4, 68.2]
@@ -113,13 +166,13 @@ begin
         dens = real(diag(ρ__))
         off = real(ρ__[diagind(ρ__, 1)])
 
-        Js = local_currents(ρ__, H_ho + drive(t))
+        Js = local_currents(ρ__, H_AOD_fl)
         curr = real.(Js[diagind(Js, 1)])
 
         title_str = "t_drive = $(round(t_targets[k], digits=1)) ms"
 
         # top: density
-        plot_grid[ k,1] = bar(dens,
+        plot_grid[ k,1] = bar(dens[1:40],
             title=title_str,
             legend=false,
             color=:blue,
@@ -127,15 +180,16 @@ begin
             dpi=300)
 
         # bottom: current
-        plot_grid[k,2] = bar(curr,
+        plot_grid[k,2] = bar(curr[1:40],
             xlabel="State index n",
             legend=false,
             color=:orange,
-            ylims=(-0.001,0.001),
+            ylims=(-0.02,0.02),
             dpi=300)
     end
 
     plot(plot_grid..., layout=(2, ncols), size=(300*ncols, 500), dpi=500)
+    savefig("bo_tomography.png")
 end
 
 plot_center_of_mass_λ(sol, sol_fl, p)

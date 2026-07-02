@@ -8,14 +8,14 @@ function HO_matrix(L::Int, ω::Float64=1.)
 end
 
 
-function RWA_FL_Hamiltonian(Vd::Matrix{ComplexF64}, p, freqs_phis::Vector{Tuple{Int, Float64}}, drive_type)
+function RWA_FL_Hamiltonian(Vd::Matrix{ComplexF64}, p, freqs_phis::Vector{Tuple{Int, Float64, Float64}}, drive_type=:smooth)
     if drive_type == :smooth
         ho = HO_matrix(p.L, 1 - p.ω_d)
         hops = zeros(ComplexF64, size(Vd))
         for i in axes(hops,1)
-            for (f, ϕ) in freqs_phis
+            for (f, ϕ, k) in freqs_phis
                 (i+f > p.L) && continue
-                hops[i,i+f] = Vd[i,i+f] *exp(-1im * ϕ)/ 2  
+                hops[i,i+f] = k * Vd[i,i+f] *exp(-1im * ϕ)/ (2im)
                 hops[i+f, i] = conj( hops[i,i+f])
             end
         end
@@ -24,9 +24,9 @@ function RWA_FL_Hamiltonian(Vd::Matrix{ComplexF64}, p, freqs_phis::Vector{Tuple{
         ho = HO_matrix(p.L, 1 - p.ω_d)
         hops = zeros(ComplexF64, size(Vd))
         for i in axes(hops,1)
-            for (f, ϕ) in freqs_phis
+            for (f, ϕ, k) in freqs_phis
                 (i+f > p.L) && continue
-                hops[i,i+f] = Vd[i,i+f] *exp(-1im * ϕ) * (-2im)/π
+                hops[i,i+f] = k * Vd[i,i+f] *exp(-1im * ϕ) * (-2im)/π
                 hops[i+f, i] = conj( hops[i,i+f])
             end
         end
@@ -35,7 +35,7 @@ function RWA_FL_Hamiltonian(Vd::Matrix{ComplexF64}, p, freqs_phis::Vector{Tuple{
 end
 
 function V_AOD_FL(drive, p)
-    ts = LinRange(0, 2π / p.ω_d, 1000)
+    ts = LinRange(0, 2π /p.ω_d, 1000)
     V_ds_exp = Vector{Matrix{ComplexF64}}(undef, length(ts))
 
     for (it,t) in enumerate(ts) 
@@ -53,7 +53,7 @@ function V_AOD_FL(drive, p)
         V_fl .+= (V_ds_exp[k] .+ V_ds_exp[k+1]) .* (dt / 2)
     end
 
-    return V_fl
+    return V_fl ./ (2π /p.ω_d)
 end
 
 function drive_elements(xs::AbstractVector{<:Real}, f::Function, L::Int)

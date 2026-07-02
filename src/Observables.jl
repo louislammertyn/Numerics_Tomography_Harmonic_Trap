@@ -36,4 +36,20 @@ function local_currents(ρ::Matrix{ComplexF64}, H::Matrix{ComplexF64})
     return J
 end
 
+function center_of_mass_evolution(sol, p)
+    l_coms = Float64[]
+
+    for s in eachindex(sol.t)
+        state = sol.u[s]
+        l_com = real(tr(state * Diagonal(0:(p.L-1))))
+        push!(l_coms, l_com)
+    end
+    return hcat(sol.t, l_coms)
+end
+
+function  λ_com(ρ, p)
+
+    return real(tr(ρ* Diagonal(0:(p.L-1))))
+end
+
 

@@ -1,3 +1,5 @@
+iref_to_k(iref) = iref * 2.28e7 / 440
+
 # Quantize times to hardware resolution
 quantize_times(t_holds, Δt_res) = round.(t_holds ./ Δt_res) .* Δt_res
 
@@ -152,9 +154,12 @@ function bin_pixels(density, xs, Δx_pix)
     end
 
     return density_pix, xs_pix
+end
 
+function bin_after_convolve(density, xs, σ, Δx)
+    return bin_pixels(convolve_gaussian(density,xs,σ) , xs, Δx)
+end
     function add_OD_noise(OD_sim; N_photon, I0)
 
         
     end
-end

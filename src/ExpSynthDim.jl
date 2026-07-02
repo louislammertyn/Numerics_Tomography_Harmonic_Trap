@@ -34,7 +34,9 @@ export x_matrix_ho,
        p_matrix_ho,
        a_matrix_ho,
        ad_matrix_ho,
-       local_currents
+       local_currents,
+       center_of_mass_evolution,
+       λ_com
 
 
 ###############################################################
@@ -62,7 +64,10 @@ export check_conservation_of_probability,
 
 
 export hermite_prod_integral,
-       hermite_function_poly_prod
+       hermite_function_poly_prod,
+       build_kernel_tensor,
+       compute_resolvability,
+       plot_singular_values
 
     
 ###############################################################
@@ -90,7 +95,7 @@ export hermite,
 
 ###############################################################
 
-export reconstruct_density_matrix_slice, get_n_tof, convolve_gaussian, scaled_hs, bin_pixels
+export reconstruct_density_matrix_slice, get_n_tof, convolve_gaussian, scaled_hs, bin_pixels, bin_after_convolve
 
 ###############################################################
 
@@ -98,5 +103,5 @@ export almost_thermal
 
 ###############################################################
 
-export t_holds_ideal, quantize_times, scaled_hs, convolve_gaussian, get_n_tof, get_n_tof_optimized, Kernel, bin_pixels
+export iref_to_k, t_holds_ideal, quantize_times, scaled_hs, convolve_gaussian, get_n_tof, get_n_tof_optimized, Kernel, bin_pixels
 end

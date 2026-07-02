@@ -29,6 +29,7 @@ begin ### HERMITE
 	    return res
 	end
 
+	
 	# integral of the product of n hermite functions
 	function hermite_prod_integral(ns::Tuple; quad_rule=gausshermite(ceil(Int, (sum(ns) + 1) / 2)))
 	    isodd(sum(ns)) && return 0.0
@@ -42,7 +43,81 @@ begin ### HERMITE
 	end
 end
 
+
 begin ## TOMOGRAPHY
+
+	
+	function build_kernel_tensor(λmax::Int, xs::Vector{Float64}, j::Int; convolve=false, σ=10.)
+		Nx = length(xs)
+		Kx = Array{Float64}(undef, Nx, λmax+1 - j)
+
+		if convolve 
+			xs_ = LinRange(minimum(xs), maximum(xs), length(xs)*20)
+			Δx  = xs[2] - xs[1]
+			for n in 0:λmax-j
+				Kx[:, n+1] .= bin_after_convolve(hermite.(n, xs_) .* hermite.(n+j, xs_), xs_, σ, Δx)[1]
+			end
+
+			return Kx
+		
+		else
+			for n in 0:λmax-j
+				Kx[:, n+1] = hermite.(n, xs) .* hermite.(n+j, xs)
+			end
+			return Kx
+		end
+
+		
+	end
+
+
+	
+
+	
+	function plot_singular_values(S)
+
+		# --- plot singular values ---
+		p1 = plot(S, yscale=:log10,
+				xlabel="mode index",
+				ylabel="singular value",
+				title="Singular value spectrum",
+				legend=false)
+
+		display(p1)
+
+	end
+
+	
+	function compute_resolvability(U, S, K; tol=1e-6)
+		Nx, Nn = size(K)
+
+		# determine rank
+		σmax = maximum(S)
+		r = sum(S .> tol*σmax)
+		println(r)
+
+		U_r = U[:, 1:r]
+
+		resolvability = zeros(Nn)
+
+		for j in 1:Nn
+			col = K[:, j]
+			proj = U_r' * col
+			resolved_part = U_r * proj
+
+			resolvability[j] = norm(resolved_part)^2 / norm(col)^2
+		end
+
+		return resolvability
+	end
+
+
+
+
+
+
+
+
 	# expects xs in units of lh, and ts in units 1/ω
 	# densities[t_holds][xs] is an Array of Arrays
 	# returns [rho(n, n+k) for n in [0, λmax-1]]
@@ -86,13 +161,6 @@ begin ## TOMOGRAPHY
 	
 	    return pinv(M) * f
 	end
-
-	
-
-
-
-
-
 
 
 end

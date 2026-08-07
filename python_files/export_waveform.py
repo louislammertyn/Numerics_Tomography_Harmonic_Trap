@@ -31,13 +31,13 @@ ys = np.linspace(-10,10, 10)
 
 a2 = drive2[11](*np.meshgrid(xs,ys))[5,:]
 
-frames = np.array([pattern(*np.meshgrid(xs,ys))[5,:] for pattern in drive2])
-np.save("../data/pattern_2drive.npy", frames)
+frames2 = np.array([pattern(*np.meshgrid(xs,ys))[5,:] for pattern in drive2])
+np.save("../data/pattern_2drive.npy", frames2)
 
-pattern = frames[33]
+pattern = frames2[36]
 
 
 plt.figure()
-plt.plot(xs, a2)
+plt.plot(xs, pattern)
 plt.savefig("pattern_2drive.png")
 plt.show()

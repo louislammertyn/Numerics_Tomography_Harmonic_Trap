@@ -57,7 +57,18 @@ function scaled_hs(xs, b, L)
     return H
 end
 
-function get_n_tof_optimized(ρ_l::Matrix{ComplexF64}, t_holds::Vector{Float64}, t_tof::Float64, xs::AbstractArray, hs; ω=1.0)
+function get_n_tof_optimized(ρ_l::Matrix{ComplexF64}, t_holds::Vector{Float64}, t_tof::Float64, xs::AbstractArray; ω=1.0)
+    """
+    Compute time-of-flight density profiles for a set of hold times.
+
+    The computation is accelerated by grouping density-matrix elements
+    according to their diagonal offset r = i-j. The spatial contraction is
+    performed once and stored in C[r,k], while the dependence on hold time
+    is incorporated afterward through simple phase factors exp(-im*r*ω*t).
+    This avoids recomputing the full density-matrix contraction for every
+    hold time.
+    """
+    
     L = size(ρ_l, 1)
     M = length(xs)
     
@@ -116,6 +127,7 @@ function get_n_tof_optimized(ρ_l::Matrix{ComplexF64}, t_holds::Vector{Float64},
     return densities
 end
 
+
     
 
 
@@ -159,7 +171,47 @@ end
 function bin_after_convolve(density, xs, σ, Δx)
     return bin_pixels(convolve_gaussian(density,xs,σ) , xs, Δx)
 end
-    function add_OD_noise(OD_sim; N_photon, I0)
 
-        
+function add_OD_noise(densities_meas, σ=0.01, μ=0.08)
+    noisy_densities = similar(densities_meas)
+
+    for i in eachindex(densities_meas)
+        density = densities_meas[i]
+        n = norm(density)
+
+        mask = abs.(density ./ maximum(density)) .> 0.01
+
+        #mask = convolve_gaussian(mask, 1:length(density),1)   # optional: broadens the noisy region
+
+        noise = ( σ .* randn(size(density))) .* n
+
+        noisy_densities[i] = density .+ noise .* mask
     end
+
+    return noisy_densities
+end
+
+
+function almost_thermal(
+    ρ_th::Matrix{ComplexF64},
+    α::Float64,
+    ξ::Float64
+)
+    N = size(ρ_th, 1)
+
+    # Hermitian perturbation
+    A = zeros(ComplexF64, N, N)
+    for i in 1:N, j in i+1:N
+        w = exp(-abs(j - i) / ξ)
+        v = randn() + 1im * randn()
+        A[i,j] = w * v
+        A[j,i] = conj(A[i,j])
+    end
+
+    # Small unitary rotation
+    U = exp(1im * α * A)
+
+    # Rotate thermal state
+    ρ = U * ρ_th * U'
+    return ρ
+end

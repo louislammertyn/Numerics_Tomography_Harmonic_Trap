@@ -1,7 +1,7 @@
 module ExpSynthDim 
 
-using FoSpCore, FoSpDynamics, FoSpFloquet
 using Plots, LinearAlgebra, FFTW, Interpolations
+using OrdinaryDiffEq
 using ProgressMeter, LaTeXStrings
 using Trapz, FastGaussQuadrature
 using JLD2
@@ -13,8 +13,8 @@ include("./params.jl")
 include("./Processing.jl")
 include("./Tomography.jl")
 include("./utils.jl")
-include("./errors.jl")
 include("./Exp_realism.jl")
+include("./Time_Ev.jl")
 
 
 ##############################################################
@@ -66,8 +66,16 @@ export check_conservation_of_probability,
 export hermite_prod_integral,
        hermite_function_poly_prod,
        build_kernel_tensor,
+       build_higher_kernel_tensor,
+       Kernel_svd,
+       Higher_Kernel_svd,
        compute_resolvability,
-       plot_singular_values
+       plot_singular_values,
+       svd_rank,
+       svd_stats,
+       build_F,
+       tikhonov_lstsq,
+       run_tomography
 
     
 ###############################################################
@@ -95,7 +103,7 @@ export hermite,
 
 ###############################################################
 
-export reconstruct_density_matrix_slice, get_n_tof, convolve_gaussian, scaled_hs, bin_pixels, bin_after_convolve
+export reconstruct_density_matrix_slice, get_n_tof, convolve_gaussian, scaled_hs, bin_pixels, bin_after_convolve, add_OD_noise
 
 ###############################################################
 
@@ -104,4 +112,6 @@ export almost_thermal
 ###############################################################
 
 export iref_to_k, t_holds_ideal, quantize_times, scaled_hs, convolve_gaussian, get_n_tof, get_n_tof_optimized, Kernel, bin_pixels
+
+export Von_Neumann_TDM!, Time_Evolution_TDM_VN
 end

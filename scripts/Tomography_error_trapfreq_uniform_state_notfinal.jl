@@ -17,7 +17,7 @@ ps = LinRange(-60, 60,5000)
 hs = hcat([hermite.(n, xs) for n in 0:p.L-1]...)
 hs_p = hcat([(-1im)^n .* hermite.(n, ps) for n in 0:p.L-1]...)
 
-t_tof = 0.000 * p.ω
+t_tof = 0.012 * p.ω
 Δt = 0.0001 *p.ω 
 
 [n * Δt for n in 1:30] ./ 2π

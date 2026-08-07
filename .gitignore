@@ -2,3 +2,9 @@
 *.jld2
 *.gif
 old
+plots
+*.npz
+*.npy
+*.h5
+data_random
+.vscode

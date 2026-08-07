@@ -8,3 +8,4 @@ plots
 *.h5
 data_random
 .vscode
+*.pdf

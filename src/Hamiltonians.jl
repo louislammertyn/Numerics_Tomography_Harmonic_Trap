@@ -35,7 +35,7 @@ function RWA_FL_Hamiltonian(Vd::Matrix{ComplexF64}, p, freqs_phis_amps::Vector{T
 end
 
 function V_AOD_FL(drive, p)
-    ts = LinRange(0, 2π /p.ω_d, 1000)
+    ts = LinRange(0, 2π /p.ω_d, 5000)
     V_ds_exp = Vector{Matrix{ComplexF64}}(undef, length(ts))
 
     for (it,t) in enumerate(ts) 

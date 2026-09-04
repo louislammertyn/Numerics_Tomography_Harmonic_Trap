@@ -270,6 +270,7 @@ begin ## TOMOGRAPHY
 		lmax::Int64,
 		t_tof::Float64,
 		Δt::Float64;
+		t_holds=nothing,
 		diags = [0],
 		α = 1e-2,
 		σ_ker = 12.0,
@@ -307,47 +308,48 @@ begin ## TOMOGRAPHY
 			for j in diags
 		)
 
-		t_ideal =
-			N_holds < 23 ?
-			t_holds_ideal(1., N_holds) :
-			t_holds_ideal(0.5, N_holds)
+		if isnothing( t_holds)
+			t_ideal =
+				N_holds < 23 ?
+				t_holds_ideal(1., N_holds) :
+				t_holds_ideal(0.5, N_holds)
 
-		t_quant =
-			quantize ?
-			quantize_times(t_ideal, Δt) :
-			t_ideal
+			t_quant =
+				quantize ?
+				quantize_times(t_ideal, Δt) :
+				t_ideal
+		else
+			t_quant = t_holds 
+		end
 
 		xs_ = LinRange(minimum(xs), maximum(xs), length(xs) * 20)
 		Δx = xs[2] - xs[1]
 
 		densities_tof = get_n_tof_optimized(
-			ρ,
-			t_quant,
-			t_tof,
-			xs_;
-			ω=ω,
-		)
+					ρ,
+					t_quant,
+					t_tof,
+					xs_;
+					ω=ω,
+				)
 
-		densities_non_pix = add_OD_noise(
-			[
+		densities_binned = [
+			bin_pixels(
 				convolve_gaussian(
 					densities_tof[i],
 					xs_,
 					σ_meas,
-				)
-				for i in 1:N_holds
-			],
-			noise_level,
-		)
-
-		densities_meas = [
-			bin_pixels(
-				densities_non_pix[i],
+				),
 				xs_,
 				Δx,
 			)[1]
 			for i in 1:N_holds
 		]
+
+		densities_meas = add_OD_noise(
+			densities_binned,
+			noise_level,
+		)
 
 		ρ_tomo = zeros(ComplexF64, size(ρ))
 
@@ -377,7 +379,7 @@ begin ## TOMOGRAPHY
 
 	
 
-		return ρ_tomo
+		return ρ_tomo, densities_meas
 	end
 
 	function run_tomography(
@@ -391,7 +393,7 @@ begin ## TOMOGRAPHY
 			ρs_sim_tomo = similar(ρs_sim)
 
 			for (id_t, ρ) in enumerate(ρs_sim)
-				ρs_sim_tomo[id_t] = run_tomography(
+				ρs_sim_tomo[id_t],_ = run_tomography(
 					ρ,
 					lmax,
 					t_tof,

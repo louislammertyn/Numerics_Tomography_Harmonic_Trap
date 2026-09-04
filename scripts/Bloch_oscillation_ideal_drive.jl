@@ -104,7 +104,3 @@ p1, p2, p3 = plot_center_of_masses(sol, p)
 
 display(p3)
 
-function check_κ(p, hop, ampl)
-    return (p.ħ * p.Δ * ampl) / (4*hop) /(p.ω*p.ħ)
-end
-check_κ(p, 0.3 *2/π,2)

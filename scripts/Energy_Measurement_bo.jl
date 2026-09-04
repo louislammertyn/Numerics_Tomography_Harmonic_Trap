@@ -7,9 +7,9 @@ using NPZ
 file = "data/pattern_single_drive.npy"
 frames = npzread(file)
 timesteps_per_drive = size(frames)[1]
-
+p.κ
 begin
-    p = make_params(; κ=iref_to_k(3e-5), L=60, T_exp=250e-9, t_e_exp= 0.1,)
+    p = make_params(; κ=iref_to_k(2.35e-5), L=60, t_e_exp= 0.1,)
     xs_μm =  LinRange(-10, 10, 5000)
     xs = xs_μm .*1e-6 ./p.lₕ 
     
@@ -31,19 +31,6 @@ begin
 
 end
 
-# plot of some drive patterns
-begin 
-    pl = plot(framestyle=:box, xlabel="x (μm)",ylabel="magnitude")
-    for h in 1:60
-        lbl =  h ==1 ? "60 Hermite modes" : ""
-        plot!(pl, xs_μm, hermite.(h, xs), label=lbl, color=:green)
-    end
-    plot!(pl, xs_μm,  p.κ .* frames[40,:], color=:blue, linewidth=2, label="AOD drive")
-    plot!(pl, xs_μm,  p.κ .* frames[1,:], color=:blue, linewidth=2, label="")
-    plot!(pl, xs_μm,  p.κ .* frames[22,:], color=:blue, linewidth=2, label="")
-    display(pl)
-end
-
 # initial state and relevant matrices 
 begin 
     H_ho = HO_matrix(p.L)
@@ -59,66 +46,205 @@ begin
         gif(anim, "animation_AOD_drive.gif", fps=30)
     end
 end
-
+p.κ
 begin
     V_d_approx = p.κ .* drive_elements(xs, step, p.L)
     H_fl = RWA_FL_Hamiltonian(V_d_approx, p, harmonics_phases_amplitudes, :smooth) - Diagonal((0.5) * ones(p.L))
-    
     V_fl = V_AOD_FL(drive, p)
     V_fl -= Diagonal(V_fl)
-    H_AOD_fl = HO_matrix(p.L, p.Δ / p.ω) + V_fl - Diagonal(0.5 * ones(p.L))
     force_fl = HO_matrix(p.L, p.Δ / p.ω)- Diagonal(0.5 * ones(p.L))
+    H_AOD_fl = force_fl + V_fl
+end   
+
+
+begin
+    ρ_diag = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/initial_state_diag.npy")
+    ρ = zeros(ComplexF64, p.L, p.L)
+    [ρ[i,i] = ρ_diag[i] for i in 1:p.L ]
+
+    #ρ = thermal_state(H_ho, p.β)
+    plot(0:p.L-1, abs.(diag(ρ)), color=:red,framestyle=:box, xlabel="λ", ylabel="|ρ(λ, λ)|", label="$(p.T_exp * 1e9) nK",marker=:o,seriestype=:sticks)
+end
+
+# run bloch oscillations 
+begin 
+    
+    ops_ts = (t-> H_ho, drive)
+
+    t1  = time()
+    sol = Time_Evolution_TDM_VN(copy(ρ), ops_ts, (p.t_i, p.t_e), p.save_ts;
+                                        rtol=1e-10, atol=1e-10)
+    t2  = time()
+    println("Simulation time for exact dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
+
+    ops_ts_fl = (t->H_AOD_fl,)
+    
+    t1  = time()
+    
+    sol_fl = Time_Evolution_TDM_VN(copy(ρ), ops_ts_fl, (p.t_i, p.t_e), p.save_ts;
+                                        rtol=1e-10, atol=1e-10)
+    t2  = time()
+    println("Simulation time for Floquet dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
+
 end
 
 
 begin
-    measurements = npzread("data/density_matrices.npz")
-    ts = measurements["t"]
+    measurements = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/exp_density_matrices.npy")
 
+    ts = [11., 19.8, 30.8, 39.6, 50.6, 59.4]
+    println(ts)
 
-    # Preallocate
+    idxs = [findmin(abs.((t * p.ω * 1e-3) .- sol.t))[2] for t in ts]
+    println(idxs)
+
+    sol_m = sol.u[idxs]
+
+    # ----------------------------
+    # Experimental densities
+    # ----------------------------
     n = length(ts)
+
     val_H = zeros(n)
     val_F = zeros(n)
     val_V = zeros(n)
     val_H_ideal = zeros(n)
 
-    # Collect observables
     for (i, t) in enumerate(ts)
-        ρ = Transpose(measurements["rho"][i, :, :])
+        ρ = Transpose(measurements[i, 1:p.L, 1:p.L])
 
-        val_H[i] = real(tr(H_AOD_fl * ρ))
-        val_F[i] = real(tr(force_fl * ρ))
-        val_V[i] = real(tr(V_fl * ρ))
+        val_H[i]       = real(tr(H_AOD_fl * ρ))
+        val_F[i]       = real(tr(force_fl * ρ))
+        val_V[i]       = real(tr(V_fl * ρ))
         val_H_ideal[i] = real(tr(H_fl * ρ))
     end
 
+    # ----------------------------
+    # Exact TD simulation
+    # ----------------------------
+    val_H_exact = [
+        real(tr(H_AOD_fl * ρ))
+        for ρ in sol_m
+    ]
+
+    val_F_exact = [
+        real(tr(force_fl * ρ))
+        for ρ in sol_m
+    ]
+
+    val_V_exact = [
+        real(tr(V_fl * ρ))
+        for ρ in sol_m
+    ]
+
+    val_H_ideal_exact = [
+        real(tr(H_fl * ρ))
+        for ρ in sol_m
+    ]
+
+    # ----------------------------
+    # Colors
+    # ----------------------------
+    colors = (
+        H      = :dodgerblue3,
+        F      = :darkorange,
+        V      = :forestgreen,
+        Hideal = :purple,
+    )
+
+    # ----------------------------
     # Plot
-    plot(ts, val_H,
-        label = "⟨H_fl⟩",
-        marker=:x,
-        lw = 2,
-        framestyle=:box)
+    # ----------------------------
+    plt = plot(
+        framestyle = :box,
+        xlabel = "t (ms)",
+        ylabel = "Expectation value (ħω)",
+        title = "Observables vs time, k=$(round(p.κ; digits=2))",
+        legend = :outertopright,
+        size = (900, 550),
+    )
 
-    plot!(ts, val_F,
-        label = "⟨Detuning⟩",
-        marker=:o,
-        lw = 2)
+    # ----------------------------
+    # Experiment (markers)
+    # ----------------------------
+    scatter!(
+        plt, ts, val_H;
+        label = "⟨H_AOD⟩ (exp)",
+        color = colors.H,
+        marker = :circle,
+        markersize = 8,
+        markerstrokecolor = :black,
+        markerstrokewidth = 1,
+        
+    )
 
-    plot!(ts, val_V,
-        label = "⟨V_AOD⟩",
-        marker=:diamond,
-        lw = 2)
+    scatter!(
+        plt, ts, val_F;
+        label = "⟨Detuning⟩ (exp)",
+        color = colors.F,
+        marker = :square,
+        markersize = 8,
+        markerstrokecolor = :black,
+        markerstrokewidth = 1,
+       
+    )
 
-    plot!(ts, val_H_ideal,
-        label = "⟨H_fl⟩ (ideal)",
-        linestyle = :dash,
-        color = :black,
-        marker=:utriangle,
-        lw = 2)
+    scatter!(
+        plt, ts, val_V;
+        label = "⟨V_AOD⟩ (exp)",
+        color = colors.V,
+        marker = :diamond,
+        markersize = 8,
+        markerstrokecolor = :black,
+        markerstrokewidth = 1,
+        
+    )
 
+    scatter!(
+        plt, ts, val_H_ideal;
+        label = "⟨H_ideal⟩ (exp)",
+        color = colors.Hideal,
+        marker = :utriangle,
+        markersize = 9,
+        markerstrokecolor = :black,
+        markerstrokewidth = 1,
+        )
 
-    xlabel!("t (ms)")
-    ylabel!("Expectation value (ħω)")
-    title!("Observables vs time")
+    # ----------------------------
+    # Exact TD simulation (lines)
+    # ----------------------------
+    plot!(
+        plt, ts, val_H_exact;
+        label = "⟨H_AOD⟩ (exact)",
+        color = colors.H,
+        lw = 3,
+    )
+
+    plot!(
+        plt, ts, val_F_exact;
+        label = "⟨Detuning⟩ (exact)",
+        color = colors.F,
+        lw = 3,
+    )
+
+    plot!(
+        plt, ts, val_V_exact;
+        label = "⟨V_AOD⟩ (exact)",
+        color = colors.V,
+        lw = 3,
+    )
+
+    plot!(
+        plt, ts, val_H_ideal_exact;
+        label = "⟨H_ideal⟩ (exact)",
+        color = colors.Hideal,
+        lw = 3,
+    )
+
+    plt
 end
+
+i = 5
+plot([real.(diag(sol_m[i],1)),real.(diag(measurements[i,:,:],1))])
+print(tr(sol_m[i]))
+print(tr(measurements["rho"][i,:,:]))

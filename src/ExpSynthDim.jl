@@ -15,7 +15,7 @@ include("./Tomography.jl")
 include("./utils.jl")
 include("./Exp_realism.jl")
 include("./Time_Ev.jl")
-
+include("./Floquet.jl")
 
 ##############################################################
 
@@ -56,7 +56,8 @@ export check_conservation_of_probability,
        plot_center_of_mass_λ,
        gif_x,
        gif_ρ,
-       gif_ρ_diag
+       gif_ρ_diag,
+       gif_ρ_diff
 
 
 ###############################################################
@@ -114,4 +115,12 @@ export almost_thermal
 export iref_to_k, t_holds_ideal, quantize_times, scaled_hs, convolve_gaussian, get_n_tof, get_n_tof_optimized, Kernel, bin_pixels
 
 export Von_Neumann_TDM!, Time_Evolution_TDM_VN
+
+
+###############################################################
+
+export Floquet_operator_num_int, Floquet_operator_seq
+
+
+
 end

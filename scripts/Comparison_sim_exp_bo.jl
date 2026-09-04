@@ -3,12 +3,12 @@ using LinearAlgebra, Plots
 using ExpSynthDim
 using NPZ 
 
-AOD_file = "data:pattern_single_drive.npy"
+AOD_file = "data/pattern_single_drive.npy"
 frames = npzread(AOD_file)
 timesteps_per_drive = size(frames)[1]
 
 begin
-    p = make_params(; κ=iref_to_k(2e-5), L=70, T_exp=240e-9, t_e_exp= 0.1,)
+    p = make_params(; κ=iref_to_k(2e-5), L=70, T_exp=200e-9, t_e_exp= 0.1,)
     xs_μm =  LinRange(-10, 10, 5000)
     xs = xs_μm .*1e-6 ./p.lₕ 
     
@@ -26,7 +26,7 @@ begin
 
     drive_width = 20
 
-    harmonics_and_phases_and_amplitudes = [(1, 0., 1.)]
+    harmonics_phases_amps = [(1, 0., 1.)]
 
 end
 
@@ -56,7 +56,9 @@ end
 
 
 begin
-    #ρ = npzread("./data/initial_state.npy")[1:p.L,1:p.L]
+    ρ_diag = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/initial_state_diag.npy")
+    ρ = zeros(ComplexF64, p.L, p.L)
+    [ρ[i,i] = ρ_diag[i] for i in 1:p.L ]
     ρ = thermal_state(H_ho, p.β)
     plot(0:p.L-1, abs.(diag(ρ)), color=:red,framestyle=:box, xlabel="λ", ylabel="|ρ(λ, λ)|", label="$(p.T_exp * 1e9) nK",marker=:o,seriestype=:sticks)
 end
@@ -101,7 +103,63 @@ begin
     ρs_sim = [sol.u[idx] for idx in idxs]
 end
 
-ρs_sim_tomo = run_tomography(ρs_sim, p.L - 1, t_tof, Δt; diags=[0,1,2])
+_, ds = run_tomography(ρs_sim[3], p.L - 1, t_tof, Δt; diags=[0,1,2], noise_level=0.1)
+ds = ds ./ norm.(ds)
+plot(ds[1:4])
+
+
+
+begin
+t_hold = t_holds_ideal(1., 15)
+
+id_rho = 2
+j = 10
+pl = plot(
+    xlabel = "Position",
+    ylabel = "Normalized density",
+    title = "TOF densities at different hold times",
+    linewidth =5,
+    legend = :right,
+    framestyle = :box,
+    gridalpha = 0.2,
+
+    size = (900, 500),
+)
+
+densities = []
+for i in 1:30
+_, ds = run_tomography(
+    ρs_sim[id_rho], p.L - 1, t_tof, Δt;
+    diags=[0],
+    noise_level=0.1,
+)
+
+ds = ds ./ norm.(ds)
+
+
+push!(densities, ds[j])
+
+    plot!(pl, xs, ds[j],lw = 3, label = "", alpha=0.3)
+end
+_, ds = run_tomography(
+    ρs_sim[id_rho], p.L - 1, t_tof, Δt;
+    diags=[0],
+    noise_level=0.,
+)
+ds = ds ./ norm.(ds)
+plot!(pl,xs, ds[j], lw=2, alpha=1, color=:black)
+plot!(pl, xs, sum(densities) / length(densities),lw=2, alpha=1, color=:green, linestyle=:dash)
+display(pl)
+end
+
+
+
+t_holds_ideal(1.,15) ./ p.ω * 1e3
+plot(abs.(build_F(ds,t_holds_ideal(1.,15), 4)))
+
+
+
+ρs_sim_tomo = run_tomography(ρs_sim, p.L - 1, t_tof, Δt; diags=[0,1,2], noise_level=0.1, α=0.4)
 
 
 for (idt, t) in enumerate(ts)

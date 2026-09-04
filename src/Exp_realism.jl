@@ -1,4 +1,4 @@
-iref_to_k(iref) = iref * 2.28e7 / 440
+iref_to_k(iref) = iref * 2.28e7 / 440.
 
 # Quantize times to hardware resolution
 quantize_times(t_holds, Δt_res) = round.(t_holds ./ Δt_res) .* Δt_res
@@ -179,11 +179,12 @@ function add_OD_noise(densities_meas, σ=0.01, μ=0.08)
         density = densities_meas[i]
         n = norm(density)
 
-        mask = abs.(density ./ maximum(density)) .> 0.01
+        mask = abs.(density ./ maximum(density)) .> 0.05
 
         #mask = convolve_gaussian(mask, 1:length(density),1)   # optional: broadens the noisy region
 
-        noise = ( σ .* randn(size(density))) .* n
+        m = maximum(density)
+        noise = ( σ .* randn(size(density))) .* m
 
         noisy_densities[i] = density .+ noise .* mask
     end

@@ -353,3 +353,195 @@ function gif_ρ_diag(sol, sol_FL, p; Nt=5000, fps=20, magfile="rho_mag.gif", pha
 
     return nothing
 end
+
+function gif_ρ_diag(
+    sol,
+    sol_FL,
+    p,
+    diag_idx=0,
+    ;
+    show_diff=false,
+    Nt=5000,
+    fps=20,
+    outfile="rho_diag.gif",
+    every=10,
+)
+
+    times = sol.t ./ p.ω .* 1e3
+
+    Nt = min(Nt, length(times))
+
+    d0 = diag(sol.u[1], diag_idx)
+
+    x = 1:length(d0)
+
+    if show_diff
+        ymax = maximum([
+            maximum(abs.(diag(sol.u[s], diag_idx)-
+                         diag(sol_FL.u[s], diag_idx)))
+            for s in 1:every:Nt
+        ])
+
+        pl = scatter(
+            x, zeros(length(d0)),
+            xlabel = "index",
+            ylabel = "|Δρ|",
+            marker = :circle,
+            color = :red,
+            ylims = (0, 1.05ymax),
+            label = "|ρ_exact - ρ_FL|",
+            framestyle = :box,
+        )
+
+        anim = @animate for s in 1:every:Nt
+            Δ = abs.(diag(sol.u[s], diag_idx) .-
+                     diag(sol_FL.u[s], diag_idx))
+
+            pl[1][1][:y] .= Δ
+            pl[1][:title] =
+                "Diagonal k=$(diag_idx), t=$(round(times[s],digits=1)) ms"
+        end
+
+    else
+
+        ymax = maximum([
+            maximum(abs.(diag(sol.u[s], diag_idx)))
+            for s in 1:every:Nt
+        ])
+
+        ymax = max(
+            ymax,
+            maximum([
+                maximum(abs.(diag(sol_FL.u[s], diag_idx)))
+                for s in 1:every:Nt
+            ])
+        )
+
+        pl = scatter(
+            x, zeros(length(d0)),
+            marker = :circle,
+            color = :orange,
+            xlabel = "index",
+            ylabel = "|ρ|",
+            ylims = (0, 1.05ymax),
+            label = "Exact",
+            framestyle = :box,
+        )
+
+        scatter!(
+            pl,
+            x, zeros(length(d0)),
+            marker = :x,
+            color = :green,
+            label = "Floquet",
+        )
+
+        anim = @animate for s in 1:every:Nt
+
+            pl[1][1][:y] .= abs.(diag(sol.u[s], diag_idx))
+            pl[1][2][:y] .= abs.(diag(sol_FL.u[s], diag_idx))
+
+            pl[1][:title] =
+                "Diagonal k=$(diag_idx), t=$(round(times[s],digits=1)) ms"
+        end
+    end
+
+    gif(anim, outfile, fps=fps)
+
+    nothing
+end
+
+function gif_ρ_diff(sol, sol_FL, p; dt=nothing, every=5, Nt=5000, fps=10,
+                     magfile="rho_diff_mag.gif", phasefile=false)
+
+    times = sol.t ./ p.ω .* 1e3
+    Nt = min(Nt, length(times))
+
+    frames = Int[]
+    if dt !== nothing
+        t0, tmax = times[1], times[Nt]
+        n_frames = floor(Int, (tmax - t0) / dt) + 1
+        frames = Vector{Int}(undef, n_frames)
+        @inbounds for n in 0:n_frames-1
+            target = t0 + n*dt
+            i = searchsortedfirst(view(times, 1:Nt), target)
+            if i == 1
+                frames[n+1] = 1
+            elseif i > Nt
+                frames[n+1] = Nt
+            else
+                frames[n+1] = abs(times[i] - target) < abs(times[i-1] - target) ? i : i - 1
+            end
+        end
+        unique!(frames)
+    else
+        frames = collect(1:every:Nt)
+    end
+
+    state, state_FL, Δ = similar(sol.u[1]), similar(sol_FL.u[1]), similar(sol.u[1])
+    data_mag = similar(Δ, Float64)
+    data_phase = similar(Δ, Float64)
+
+    zmax = 0.0
+    for s in frames
+        Δ .= sol.u[s] .- sol_FL.u[s]
+        zmax = max(zmax, maximum(abs.(Δ)))
+    end
+
+    axes = 1:p.L
+
+    # --- Modulus ---
+    hm_mag = heatmap(axes, axes, zeros(p.L, p.L),
+        xlabel=L"λ'", ylabel=L"λ",
+        color=:viridis,
+        clims=(0, zmax),
+        dpi=200
+    )
+
+    # seed the z-surface with a real matrix BEFORE broadcasting into it
+    state .= sol.u[frames[1]]
+    state_FL .= sol_FL.u[frames[1]]
+    Δ .= state .- state_FL
+    hm_mag[1][1][:z] = abs.(Δ)
+
+    anim_mag = @animate for s in frames
+        state .= sol.u[s]
+        state_FL .= sol_FL.u[s]
+        Δ .= state .- state_FL
+        data_mag .= abs.(Δ)
+
+        hm_mag[1][1][:z] .= data_mag
+        hm_mag[1][:title] = "|ρ_exact - ρ_Floquet| at t=$(round(times[s]; digits=2)) ms"
+    end
+
+    gif(anim_mag, magfile, fps=fps)
+
+    if phasefile == false
+        return nothing
+    else
+        hm_phase = heatmap(axes, axes, zeros(p.L, p.L),
+            xlabel=L"λ'", ylabel=L"λ",
+            color=:cyclic_wrwbw_40_90_c42_n256_s25,
+            clims=(0, 2π),
+            dpi=200
+        )
+
+        # seed here too
+        state .= sol.u[frames[1]]
+        state_FL .= sol_FL.u[frames[1]]
+        Δ .= state .- state_FL
+        hm_phase[1][1][:z] = angle.(Δ)
+
+        anim_phase = @animate for s in frames
+            state .= sol.u[s]
+            state_FL .= sol_FL.u[s]
+            Δ .= state .- state_FL
+            data_phase .= angle.(Δ)
+
+            hm_phase[1][1][:z] .= data_phase
+            hm_phase[1][:title] = "θ = arg(ρ_exact - ρ_Floquet) at t=$(round(times[s]; digits=2)) ms"
+        end
+
+        gif(anim_phase, phasefile, fps=fps)
+    end
+end

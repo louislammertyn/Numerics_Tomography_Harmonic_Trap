@@ -91,7 +91,7 @@ begin
     t2  = time()
     println("Simulation time for exact dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
 
-    ops_ts_fl = (t->H_AOD_fl,)
+    ops_ts_fl = (t->H_fl,)
     
     t1  = time()
     
@@ -101,6 +101,44 @@ begin
     println("Simulation time for Floquet dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
 
 end
+
+function plot_stroboscopic_diag_errors(sol, sol_FL, p; n_diags=5)
+    T = 2π / p.ω_d
+    
+    tsexact = sol.t
+    tsfl    = sol_FL.t
+
+    n = norm(sol.u[1])
+
+    nmax = floor(Int, minimum((maximum(tsexact), maximum(tsfl))) / T)
+
+    indsexact = [argmin(abs.(tsexact .- n*T)) for n in 0:nmax]
+    indsfl    = [argmin(abs.(tsfl    .- n*T)) for n in 0:nmax]
+
+    pl = plot(
+        xlabel="Periods",
+        ylabel=L"|\rho_{\rm exact}-\rho_{\rm Floquet}|_F \, / \, |\rho_{\rm exact}|_F",
+        title="Stroboscopic error per diagonal",
+        framestyle=:box,
+        legend=:topleft,
+    )
+
+    for k in 0:n_diags-1
+        errs = [
+            norm(diag(sol.u[ie], k) .- diag(sol_FL.u[ifl], k)) / max(norm(diag(sol_FL.u[ie], k)), 1e-8)
+            for (ie, ifl) in zip(indsexact, indsfl)
+        ]
+        plot!(pl, 0:nmax, errs, lw=2, marker=:circle, label="k=$k")
+    end
+
+    return pl
+end
+
+plot_stroboscopic_diag_errors(sol, sol_fl, p; n_diags=1)
+
+plot_center_of_mass_λ(sol, sol_fl, p)
+gif_ρ_diag(sol,sol_fl,p, 3)
+gif_ρ_diff(sol,sol_fl,p; dt = (2π/p.ω_d) )
 
 data_exp = [
     2.2   11.858909037431372  0.7217373168802633;

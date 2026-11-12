@@ -146,13 +146,13 @@ begin
 # Parameters
 # --------------------------------------------------
 
-σconv = 12.0
+σconv = 1.0
 α     = 1e-2
 
 xs = collect(LinRange(-853., 911., 170))
 b  = 33.2
 
-lmax_list = 1:4:41
+lmax_list = 1:5:61
 
 ηfull_vals = Float64[]
 ηRsec_vals = Float64[]
@@ -236,6 +236,7 @@ p = plot(
     legend = :topright,
     size = (500, 350),
     margin = 4Plots.mm,
+        dpi = 300
 )
 
 plot!(
@@ -244,10 +245,12 @@ plot!(
     ηRsec_vals;
     color = RGB(0.8,0.1,0.1),
     linestyle = :dash,
-    label = L"\eta_{\rm sec}",
+    label = L"\eta_{\rm proj}",
+
 )
 display(p)
 savefig(p, "eta_vs_lmax.png")
+savefig(p, "eta_vs_lmax.pdf")
 end
 
 begin

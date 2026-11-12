@@ -2,14 +2,16 @@ using Revise
 using LinearAlgebra, Plots
 using ExpSynthDim
 using NPZ 
+using JLD2
+using SHA
 
 # here the file name of the AOD pattern
 file = "data/pattern_single_drive.npy"
 frames = npzread(file)
 timesteps_per_drive = size(frames)[1]
-p.κ
+
 begin
-    p = make_params(; κ=iref_to_k(2.35e-5), L=60, t_e_exp= 0.1,)
+    p = make_params(; κ=iref_to_k(3.e-5), L=60, t_e_exp= 0.1,)
     xs_μm =  LinRange(-10, 10, 5000)
     xs = xs_μm .*1e-6 ./p.lₕ 
     
@@ -30,7 +32,7 @@ begin
     harmonics_phases_amplitudes = [(1, 0., 1.)]
 
 end
-
+p.κ
 # initial state and relevant matrices 
 begin 
     H_ho = HO_matrix(p.L)
@@ -58,41 +60,93 @@ end
 
 
 begin
-    ρ_diag = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/initial_state_diag.npy")
+    ρ_diag = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/initial_state.npz")
     ρ = zeros(ComplexF64, p.L, p.L)
-    [ρ[i,i] = ρ_diag[i] for i in 1:p.L ]
+    [ρ[i,i] = ρ_diag["initial"][i] for i in 1:p.L ]
 
     #ρ = thermal_state(H_ho, p.β)
     plot(0:p.L-1, abs.(diag(ρ)), color=:red,framestyle=:box, xlabel="λ", ylabel="|ρ(λ, λ)|", label="$(p.T_exp * 1e9) nK",marker=:o,seriestype=:sticks)
 end
 
-# run bloch oscillations 
+
 begin 
-    
-    ops_ts = (t-> H_ho, drive)
+fname = "data/sims/sim_$(bytes2hex(sha1(repr(p)))).jld2"
 
-    t1  = time()
-    sol = Time_Evolution_TDM_VN(copy(ρ), ops_ts, (p.t_i, p.t_e), p.save_ts;
-                                        rtol=1e-10, atol=1e-10)
-    t2  = time()
-    println("Simulation time for exact dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
+if isfile(fname)
 
-    ops_ts_fl = (t->H_AOD_fl,)
-    
-    t1  = time()
-    
-    sol_fl = Time_Evolution_TDM_VN(copy(ρ), ops_ts_fl, (p.t_i, p.t_e), p.save_ts;
-                                        rtol=1e-10, atol=1e-10)
-    t2  = time()
-    println("Simulation time for Floquet dynamics with $(p.L) modes is $(round((t2-t1)/60, digits=5)) mins")
+    @load fname sol sol_fl
 
+else
+
+    ops_ts = (t -> H_ho, drive)
+
+    sol = Time_Evolution_TDM_VN(
+        copy(ρ), ops_ts, (p.t_i, p.t_e), p.save_ts;
+        rtol=1e-10, atol=1e-10
+    )
+
+    ops_ts_fl = (t -> H_AOD_fl,)
+
+    sol_fl = Time_Evolution_TDM_VN(
+        copy(ρ), ops_ts_fl, (p.t_i, p.t_e), p.save_ts;
+        rtol=1e-10, atol=1e-10
+    )
+
+    @save fname sol sol_fl
+
+end
 end
 
 
 begin
-    measurements = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/exp_density_matrices.npy")
+using NPZ
 
-    ts = [11., 19.8, 30.8, 39.6, 50.6, 59.4]
+data = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/tomography_stats.npz")
+
+tdrives = sort(unique([
+    parse(Int, m.captures[1])
+    for k in keys(data)
+    for m in [match(r"^mean_tdrive_(\d+)_j_(\d+)$", k)]
+    if !isnothing(m)
+]))
+
+tmap = Dict(t => i for (i, t) in enumerate(tdrives))
+
+n = length(data["mean_tdrive_0_j_0"])
+
+ρ_m = zeros(ComplexF64, length(tdrives), n, n)
+
+for key in keys(data)
+
+    m = match(r"^mean_tdrive_(\d+)_j_(\d+)$", key)
+    isnothing(m) && continue
+
+    t = parse(Int, m.captures[1])
+    j = parse(Int, m.captures[2])
+
+    tidx = tmap[t]
+
+    diagvals = ComplexF64.(data[key])
+
+    for k in 1:length(diagvals)
+        ρ_m[tidx, k, k+j] = diagvals[k]
+    end
+
+    if j > 0
+        for k in 1:length(diagvals)
+            ρ_m[tidx, k+j, k] = conj(diagvals[k])
+        end
+    end
+end
+ρ_init_diag = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/initial_state.npz")
+ρ_init = zeros(ComplexF64, p.L, p.L)
+[ρ_init[i,i] = ρ_diag["initial"][i] for i in 1:p.L ]
+end
+
+begin
+    #measurements = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/exp_density_matrices.npy")
+
+    ts = [0., 11., 19.8, 30.8, 39.6, 50.6, 59.4]
     println(ts)
 
     idxs = [findmin(abs.((t * p.ω * 1e-3) .- sol.t))[2] for t in ts]
@@ -111,7 +165,11 @@ begin
     val_H_ideal = zeros(n)
 
     for (i, t) in enumerate(ts)
-        ρ = Transpose(measurements[i, 1:p.L, 1:p.L])
+        if iszero(t)
+            ρ = ρ_init
+        else
+            ρ = Transpose(ρ_m[i-1, 1:p.L, 1:p.L])
+        end
 
         val_H[i]       = real(tr(H_AOD_fl * ρ))
         val_F[i]       = real(tr(force_fl * ρ))
@@ -213,12 +271,12 @@ begin
     # ----------------------------
     # Exact TD simulation (lines)
     # ----------------------------
-    plot!(
-        plt, ts, val_H_exact;
-        label = "⟨H_AOD⟩ (exact)",
-        color = colors.H,
-        lw = 3,
-    )
+    # plot!(
+    #     plt, ts, val_H_exact;
+    #     label = "⟨H_AOD⟩ (exact)",
+    #     color = colors.H,
+    #     lw = 3,
+    # )
 
     plot!(
         plt, ts, val_F_exact;
@@ -243,8 +301,30 @@ begin
 
     plt
 end
+begin
+    using NPZ
 
-i = 5
-plot([real.(diag(sol_m[i],1)),real.(diag(measurements[i,:,:],1))])
-print(tr(sol_m[i]))
-print(tr(measurements["rho"][i,:,:]))
+npzwrite(
+    "C:/dev/SyntheticDimensionsUtils/data_for_num/observable_plot_data.npz",
+    Dict(
+        # x-axis
+        "ts" => ts,
+
+        # experiment
+        "val_H_exp"       => val_H,
+        "val_F_exp"       => val_F,
+        "val_V_exp"       => val_V,
+        "val_H_ideal_exp" => val_H_ideal,
+
+        # exact theory
+        "val_H_exact"       => val_H_exact,
+        "val_F_exact"       => val_F_exact,
+        "val_V_exact"       => val_V_exact,
+        "val_H_ideal_exact" => val_H_ideal_exact,
+
+        # optional metadata
+        "kappa" => [p.κ],
+    )
+)
+end
+

@@ -5,21 +5,6 @@ using JLD2, NPZ
 using ExpSynthDim
 using Plots
 
-AOD_single_drive = "data/pattern_single_drive.npy"
-frames_sd = npzread(AOD_single_drive)
-timesteps_per_drive_sd = size(frames_sd)[1]
-for i in 1:56
-    display(plot(frames_sd[i,:], ylims=(0.5,2.5)))
-end
-
-plot([(frames_sd[1,:] .- 1.5), -(frames_sd[56,:].-1.5)])
-
-AOD_2drive = "data/pattern_multi_drive.npy"
-frames_2d = npzread(AOD_2drive)
-timesteps_per_drive_2d = size(frames_2d)[1] 
-for i in 1:56
-    display(plot(frames_2d[i,:], ylims=(0.5,4.5)))
-end
 
 k=2
 begin
@@ -41,7 +26,61 @@ begin
 
     harmonics_phases_amps = [(1, 0., 1.)]
 
+    σ_eff = 1.1
+
 end
+
+begin
+    plot_ = false
+
+    AOD_single_drive = "C:/dev/SyntheticDimensionsUtils/data/pattern_single_drive.npy"
+    frames_sd = npzread(AOD_single_drive)
+    timesteps_per_drive_sd = size(frames_sd)[1]
+    
+
+    frames_sd_conv = copy(frames_sd)
+    for i in eachindex(frames_sd[:,1])
+    frames_sd_conv[i, :] = convolve_gaussian(frames_sd_conv[i,:], xs,σ_eff *1e-6 ./p.lₕ )
+    end
+
+    if plot_
+        for i in 1:56
+            display(plot([frames_sd[i,:],frames_sd_conv[i,:]] , ylims=(0.5,2.5)))
+        end
+    end
+
+    AOD_single_drive_no_av = "C:/dev/SyntheticDimensionsUtils/data/pattern_single_drive_no_av.npy"
+    frames_sd_no_av = npzread(AOD_single_drive_no_av)
+    timesteps_per_drive_sd = size(frames_sd_no_av)[1]
+    
+
+
+    if plot_
+        for i in 1:56
+            display(plot([frames_sd[i,:],frames_sd_conv[i,:]] , ylims=(0.5,2.5)))
+        end
+    end
+
+
+
+    AOD_2drive = "data/pattern_multi_drive.npy"
+    frames_2d = npzread(AOD_2drive)
+    timesteps_per_drive_2d = size(frames_2d)[1] 
+   
+
+    frames_2d_conv = copy(frames_2d)
+    for i in eachindex(frames_2d[:,1])
+        frames_2d_conv[i, :] = convolve_gaussian(frames_2d_conv[i,:], xs,σ_eff *1e-6 ./p.lₕ )
+    end
+
+    if plot_
+        for i in 1:56
+            display(plot([frames_2d[i,:],frames_2d_conv[i,:]] , ylims=(0.5,3.5)))
+        end
+    end
+
+end
+
 
 # initial state and relevant matrices 
 begin 
@@ -51,8 +90,18 @@ begin
     const V_sd = [drive_elements(xs,   p.κ .*  frames_sd[nt, :], p.L) for nt in 1:timesteps_per_drive_sd]
     drive_sd(t) =  V_sd[Int(mod(div(t, AOD_res_sd), timesteps_per_drive_sd))+1]
 
+    const V_sd_no_av = [drive_elements(xs,   p.κ .*  frames_sd_no_av[nt, :], p.L) for nt in 1:timesteps_per_drive_sd]
+    drive_sd_no_av(t) =  V_sd_no_av[Int(mod(div(t, AOD_res_sd), timesteps_per_drive_sd))+1]
+
     const V_2d =    [drive_elements(xs, p.κ .* frames_2d[nt, :], p.L) for nt in 1:timesteps_per_drive_2d]
     drive_2d(t) = V_2d[Int(mod(div(t, AOD_res_2d), timesteps_per_drive_2d))+1]
+
+    const V_sd_conv = [drive_elements(xs,   p.κ .*  frames_sd_conv[nt, :], p.L) for nt in 1:timesteps_per_drive_sd]
+    drive_sd_conv(t) =  V_sd_conv[Int(mod(div(t, AOD_res_sd), timesteps_per_drive_sd))+1]
+
+    const V_2d_conv =    [drive_elements(xs, p.κ .* frames_2d_conv[nt, :], p.L) for nt in 1:timesteps_per_drive_2d]
+    drive_2d_conv(t) = V_2d_conv[Int(mod(div(t, AOD_res_2d), timesteps_per_drive_2d))+1]
+
 
     V_d_ideal = p.κ .* drive_elements(xs, step, p.L)
 
@@ -64,6 +113,14 @@ begin
     V_fl_sd = V_AOD_FL(drive_sd, p)
     V_fl_sd -= I(p.L) * (sum(diag(V_fl_sd,0)) / p.L)
     H_fl_sd = V_fl_sd  + HO_matrix(p.L, p.Δ/p.ω) - 0.5*I(p.L)
+
+    V_fl_sd_no_av = V_AOD_FL(drive_sd_no_av, p)
+    V_fl_sd_no_av -= I(p.L) * (sum(diag(V_fl_sd_no_av,0)) / p.L)
+    H_fl_sd_no_av = V_fl_sd_no_av  + HO_matrix(p.L, p.Δ/p.ω) - 0.5*I(p.L)
+
+    V_fl_sd_conv = V_AOD_FL(drive_sd_conv, p)
+    V_fl_sd_conv -= I(p.L) * (sum(diag(V_fl_sd_conv,0)) / p.L)
+    H_fl_sd_conv = V_fl_sd_conv  + HO_matrix(p.L, p.Δ/p.ω) - 0.5*I(p.L)
 
     H_fl_AOD_m = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/Hamiltonian_elements_AOD.npy")
     H_fl_AOD_m += HO_matrix(p.L, p.Δ/p.ω) - 0.5*I(p.L)
@@ -79,6 +136,9 @@ begin
     V_fl_2d -= I(p.L) * (sum(diag(V_fl_2d,0)) / p.L)
     H_fl_2d = V_fl_2d 
 
+    V_fl_2d_conv = V_AOD_FL(drive_2d_conv, p)
+    V_fl_2d_conv -= I(p.L) * (sum(diag(V_fl_2d_conv,0)) / p.L)
+    H_fl_2d_conv = V_fl_2d_conv 
 
     H_fl_AOD_m = npzread("C:/dev/SyntheticDimensionsUtils/data_for_num/Hamiltonian_elements_AOD.npy")
     H_fl_AOD_m_2d =  copy(H_fl_AOD_m)
@@ -87,43 +147,66 @@ begin
     p = make_params(;κ = k * iref_to_k(1e-5), L = 50)
 
 end
-H_fl_AOD_m_sd
-H_fl_AOD_m_2d
+begin
+    gr()  # LaTeX-quality output; use gr() if you don't have pgfplots
 
-func_sd(t) = Int(mod(div(t, AOD_res_sd), timesteps_per_drive_sd))+1
-func_2d(t) = Int(mod(div(t, AOD_res_2d), timesteps_per_drive_2d))+1
+d1 = abs.(H_fl_AOD_m_sd[diagind(H_fl_AOD_m_sd, 1)])[1:30]
+d2 = abs.(H_fl_sd[diagind(H_fl_AOD_m_sd, 1)])
+d3 = abs.(H_fl_sd_conv[diagind(H_fl_AOD_m_sd, 1)])
+d4 = abs.(H_fl_ideal[diagind(H_fl_AOD_m_sd, 1)])
+d5 = abs.(H_fl_sd_no_av[diagind(H_fl_AOD_m_sd, 1)])
 
-func_sd(0)
-func_2d(6.29)
+plot(
+    [d1, d5, d2, d3, d4],
+    marker="o",
+    markersize=2,
+    label     = ["Measured" "AOD_no_z_av" "AOD_z_av" "AOD_z_av + conv" "Ideal" ],
+    xlabel    = "index+1",
+    ylabel    = "|\$H_{l,l+1}\$|",
+    title     = "First diagonal of \$H\$",
+    lw        = 2,
+    palette   = :tab10,
+    framestyle = :box,
+    legend    = :bottomright,
+    dpi       = 300,
+    
+)
+end
+[print(i) for i in 0:7]
+# H_fl_AOD_m_2d
 
-diag(H_fl_ideal_2d,0)
-heatmap(abs.(abs.(H_fl_ideal  ) - abs.(H_fl_sd)))
-heatmap(abs.(abs.(H_fl_ideal_2d  ) - abs.(H_fl_2d)))
-heatmap(abs.(angle.(H_fl_ideal  ) - angle.( H_fl_sd)))
-abs.(H_fl_2d)
-abs.(H_fl_ideal_2d)
+# func_sd(t) = Int(mod(div(t, AOD_res_sd), timesteps_per_drive_sd))+1
+# func_2d(t) = Int(mod(div(t, AOD_res_2d), timesteps_per_drive_2d))+1
 
-abs.(H_fl_sd)
-abs.(H_fl_ideal)
+# func_sd(0)
+# func_2d(6.29)
 
-timesteps_per_drive_sd * AOD_res
-2π/ p.ω_d
+# diag(H_fl_ideal_2d,0)
+# heatmap(abs.(abs.(H_fl_ideal  ) - abs.(H_fl_sd)))
+# heatmap(abs.(abs.(H_fl_ideal_2d  ) - abs.(H_fl_2d)))
+# heatmap(abs.(angle.(H_fl_ideal  ) - angle.( H_fl_sd)))
+# abs.(H_fl_2d)
+# abs.(H_fl_ideal_2d)
+
+# abs.(H_fl_sd)
+# abs.(H_fl_ideal)
 
 begin 
     T_d = (2π/p.ω_d)
-    U_fl_ideal = exp(-1im * T_d * H_fl_ideal)
-    U_fl_AOD_ideal = exp(-1im * T_d * (H_fl_sd))
-    #U_fl = Floquet_operator_num_int([H_ho, V_d_ideal], [t -> 1., t -> sin(t)], 2π/p.ω_d)
-    U_fl_AOD = Floquet_operator_seq(V_sd .+ [(H_ho - I(p.L)*0.5) for i in 1:length(V_sd)],T_d)
+    U_fl_ideal_sd = exp(-1im * T_d * H_fl_ideal)
+    U_fl_AOD_ideal_sd = exp(-1im * T_d * (H_fl_sd))
+    U_fl_AOD_sd = Floquet_operator_seq(V_sd .+ [(H_ho - I(p.L)*0.5) for i in 1:length(V_sd)],T_d)
+    U_fl_AOD_ideal_sd_conv = exp(-1im * T_d * (H_fl_sd_conv))
+    U_fl_AOD_sd_conv = Floquet_operator_seq(V_sd_conv .+ [(H_ho - I(p.L)*0.5) for i in 1:length(V_sd)],T_d)
 
     U_fl_AOD_m_sd = exp(-1im * T_d * (H_fl_AOD_m_sd))
     U_fl_AOD_m_2d = exp(-1im * T_d * (H_fl_AOD_m_2d))
 
-    U_fl_AOD_2d = Floquet_operator_seq(V_2d .+ [(H_ho - I(p.L)*0.5) for i in 1:length(V_2d)],2π)
     U_fl_ideal_2d = exp(-1im * T_d * (H_fl_ideal_2d))
     U_fl_AOD_ideal_2d = exp(-1im * T_d * (H_fl_2d))
-    #U_fl_2d = Floquet_operator_num_int([H_ho, V_d_ideal, V_d_ideal], [t -> 1., t -> sin(t), t -> 3. * sin(3*t)], 2π)
-
+    U_fl_AOD_2d = Floquet_operator_seq(V_2d .+ [(H_ho - I(p.L)*0.5) for i in 1:length(V_2d)],2π)
+    U_fl_AOD_ideal_2d_conv = exp(-1im * T_d * (H_fl_2d_conv))
+    U_fl_AOD_2d = Floquet_operator_seq(V_2d_conv .+ [(H_ho - I(p.L)*0.5) for i in 1:length(V_2d)],2π)
 
 end
 
@@ -160,37 +243,50 @@ npzwrite("data/ideal_vs_aod_elements_iref$k.npy", Dict( "H_fl_ideal" => H_fl_ide
 # should show how each diagonal compares
 ######################################
 begin
-    Nj = 6
-    Nn = length(ns)
-
+    times = Int.(round.([0, 0.29, 0.45, 0.74, 0.99] .* (68.75/2.2); digits=0))
+    Nn = length(times)
     data = zeros(ComplexF64,  4, Nn+1, p.L, p.L)
     
-    for n in ns 
-        data[1,n+1,:,:] .= U_fl_ideal^n * ρ0 * (U_fl_ideal')^n
-        data[2,n+1,:,:] .= U_fl_AOD_ideal^n * ρ0 * (U_fl_AOD_ideal')^n
-        data[3,n+1,:,:] .= U_fl_AOD^n * ρ0 * (U_fl_AOD')^n
-        data[4,n+1,:,:] .= U_fl_AOD_m_sd^n * ρ0 * (U_fl_AOD_m_sd')^n
+    
+    for (n,t_d) in enumerate(times)
+        # Ideal sim
+        data[1,n,:,:] .= (U_fl_ideal_sd')^t_d * ρ0 * (U_fl_ideal_sd)^t_d
+        
+        # Sim with AOD pattern with z-averaging
+        data[2,n,:,:] .= (U_fl_AOD_sd')^t_d * ρ0 * (U_fl_AOD_sd)^(t_d)
+        
+        # Sim with AOD z-averging and convolution
+        data[3,n,:,:] .= (U_fl_AOD_sd_conv')^t_d * ρ0 * (U_fl_AOD_sd_conv)^t_d
+        
+        # Sim with hopping elements from tomography
+        data[4,n,:,:] .= (U_fl_AOD_m_sd')^t_d * ρ0 * (U_fl_AOD_m_sd)^t_d
 
         
     end
 
-    npzwrite("data/ideal_vs_AOD_sd_iref$k.npy", data)
+    npzwrite("data/ideal_vs_AOD_sd_vs_AOD_conv_iref$k.npy", data)
 
 end
+times
+data
+real.(diag(data[3,1, :,:]))
+plot([real.(diag(data[1,n, :,:])) for n in 1:5])
 
 begin
     Nj = 6
     Nn = length(ns)
 
     data = zeros(ComplexF64,  4, Nn+1, p.L, p.L)
-    
-    for n in ns 
+   
+    for n in times
         data[1,n+1,:,:] .= U_fl_ideal_2d^n * ρ0 * (U_fl_ideal_2d')^n
         data[2,n+1,:,:] .= U_fl_AOD_ideal_2d^n * ρ0 * (U_fl_AOD_ideal_2d')^n
         data[3,n+1,:,:] .= U_fl_AOD_2d^n * ρ0 * (U_fl_AOD_2d')^n
         data[4,n+1,:,:] .= U_fl_AOD_m_2d^n * ρ0 * (U_fl_AOD_m_2d')^n
         
     end
+
+
 
     npzwrite("data/ideal_vs_AOD_2d_iref$k.npy", data)
 

@@ -75,6 +75,9 @@ export hermite_prod_integral,
        svd_rank,
        svd_stats,
        build_F,
+       tomography_weights,
+       harmonic_residual,
+       kernel_phase,
        tikhonov_lstsq,
        run_tomography
 
